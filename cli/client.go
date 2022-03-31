@@ -14,7 +14,10 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"sdshttp/srv"
 	"sdshttp/util"
+
+	_ "github.com/go-sql-driver/mysql"
 )
 
 // chk comprueba y sale si hay errores (ahorra escritura en programas sencillos)
@@ -31,9 +34,9 @@ func registro(pubJSON []byte, pkJSON []byte, client *http.Client) {
 
 	fmt.Println("*** Registro ***")
 	fmt.Println("Usuario: ")
-	fmt.Scanln(usuario)
+	fmt.Scanln(&usuario)
 	fmt.Println("Contraseña: ")
-	fmt.Scanln(password)
+	fmt.Scanln(&password)
 
 	// ** ejemplo de registro
 	data := url.Values{}        // estructura para contener los valores
@@ -60,6 +63,35 @@ func registro(pubJSON []byte, pkJSON []byte, client *http.Client) {
 	fmt.Println()
 }
 
+func login(client *http.Client) {
+	// ** ejemplo de login
+
+	usuario := ""
+	password := ""
+
+	fmt.Println("*** Login ***")
+	fmt.Println("Usuario: ")
+	fmt.Scanln(&usuario)
+	fmt.Println("Contraseña: ")
+	fmt.Scanln(&password)
+
+	data := url.Values{}
+	data.Set("cmd", "login")  // comando (string)
+	data.Set("user", usuario) // usuario (string)
+
+	// hash con SHA512 de la contraseña
+	keyClient := sha512.Sum512([]byte(password))
+	keyLogin := keyClient[:32] // una mitad para el login (256 bits)
+
+	data.Set("pass", util.Encode64(keyLogin))                  // contraseña (a base64 porque es []byte)
+	r, err := client.PostForm("https://localhost:10443", data) // enviamos por POST
+	chk(err)
+	resp := srv.Resp{}
+	json.NewDecoder(r.Body).Decode(&resp) // decodificamos la respuesta para utilizar sus campos más adelante
+	fmt.Println(resp)                     // imprimimos por pantalla
+	r.Body.Close()                        // hay que cerrar el reader del body
+}
+
 // Run gestiona el modo cliente
 func Run() {
 
@@ -77,48 +109,48 @@ func Run() {
 [ 3 ] Salir
 
 `
+	for opcion != 3 {
+		fmt.Print(menu)
+		fmt.Scanln(&opcion)
 
-	fmt.Print(menu)
-	fmt.Scanln(&opcion)
+		/* creamos un cliente especial que no comprueba la validez de los certificados
+		esto es necesario por que usamos certificados autofirmados (para pruebas) */
 
-	fmt.Println(opcion)
+		tr := &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		}
+		client := &http.Client{Transport: tr}
 
-	/* creamos un cliente especial que no comprueba la validez de los certificados
-	esto es necesario por que usamos certificados autofirmados (para pruebas) */
+		// hash con SHA512 de la contraseña
+		/*
+			keyClient := sha512.Sum512([]byte("contraseña del cliente"))
+			keyLogin := keyClient[:32]  // una mitad para el login (256 bits)
+			keyData := keyClient[32:64] // la otra para los datos (256 bits)
+		*/
 
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-	client := &http.Client{Transport: tr}
+		// generamos un par de claves (privada, pública) para el servidor
+		pkClient, err := rsa.GenerateKey(rand.Reader, 1024)
+		chk(err)
+		pkClient.Precompute() // aceleramos su uso con un precálculo
 
-	// hash con SHA512 de la contraseña
-	/*
-		keyClient := sha512.Sum512([]byte("contraseña del cliente"))
-		keyLogin := keyClient[:32]  // una mitad para el login (256 bits)
-		keyData := keyClient[32:64] // la otra para los datos (256 bits)
-	*/
+		pkJSON, err := json.Marshal(&pkClient) // codificamos con JSON
+		chk(err)
 
-	// generamos un par de claves (privada, pública) para el servidor
-	pkClient, err := rsa.GenerateKey(rand.Reader, 1024)
-	chk(err)
-	pkClient.Precompute() // aceleramos su uso con un precálculo
+		keyPub := pkClient.Public()           // extraemos la clave pública por separado
+		pubJSON, err := json.Marshal(&keyPub) // y codificamos con JSON
+		chk(err)
 
-	pkJSON, err := json.Marshal(&pkClient) // codificamos con JSON
-	chk(err)
-
-	keyPub := pkClient.Public()           // extraemos la clave pública por separado
-	pubJSON, err := json.Marshal(&keyPub) // y codificamos con JSON
-	chk(err)
-
-	switch opcion {
-	case 1:
-		registro(pubJSON, pkJSON, client)
-		break
-	case 2:
-		break
-	default:
-		fmt.Println("Hasta luego!!")
-		break
+		switch opcion {
+		case 1:
+			registro(pubJSON, pkJSON, client)
+			break
+		case 2:
+			login(client)
+			break
+		default:
+			fmt.Println("Hasta luego!!")
+			break
+		}
 	}
 
 	/*

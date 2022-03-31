@@ -7,9 +7,11 @@ import (
 	"bytes"
 	"crypto/rand"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"sdshttp/util"
+	"strconv"
 	"time"
 
 	"golang.org/x/crypto/scrypt"
@@ -53,6 +55,8 @@ func handler(w http.ResponseWriter, req *http.Request) {
 
 	switch req.Form.Get("cmd") { // comprobamos comando desde el cliente
 	case "register": // ** registro
+
+		fmt.Println("Usuarios antes de hacer el registro: " + strconv.Itoa(len(gUsers)))
 		_, ok := gUsers[req.Form.Get("user")] // ¿existe ya el usuario?
 		if ok {
 			response(w, false, "Usuario ya registrado", nil)
@@ -74,8 +78,8 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		u.Seen = time.Now()        // asignamos tiempo de login
 		u.Token = make([]byte, 16) // token (16 bytes == 128 bits)
 		rand.Read(u.Token)         // el token es aleatorio
-
 		gUsers[u.Name] = u
+		fmt.Println("Usuarios despues de hacer el registro: " + strconv.Itoa(len(gUsers)))
 		response(w, true, "Usuario registrado", u.Token)
 
 	case "login": // ** login
