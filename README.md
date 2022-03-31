@@ -3,8 +3,8 @@
 ## Modelos
 
 - Usuario
-  ...
-  directorio Directorio
+...
+directorio Directorio
 
 - Directorio
 nombre string
