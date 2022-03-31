@@ -1,7 +1,7 @@
-module sdshttp
+module sdspractica
 
 go 1.17
 
-require golang.org/x/crypto v0.0.0-20220312131142-6068a2e6cfdc
+require golang.org/x/crypto v0.0.0-20220321153916-2c7772ba3064
 
-require github.com/go-sql-driver/mysql v1.6.0 // indirect
+require golang.org/x/sys v0.0.0-20210615035016-665e8c7367d1 // indirect

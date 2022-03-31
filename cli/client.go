@@ -14,10 +14,8 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"sdshttp/srv"
-	"sdshttp/util"
-
-	_ "github.com/go-sql-driver/mysql"
+	"sdspractica/srv"
+	"sdspractica/util"
 )
 
 // chk comprueba y sale si hay errores (ahorra escritura en programas sencillos)

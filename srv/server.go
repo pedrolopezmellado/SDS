@@ -6,22 +6,25 @@ package srv
 import (
 	"bytes"
 	"crypto/rand"
+	"crypto/subtle"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"sdshttp/util"
+	"sdspractica/util"
 	"strconv"
+	"strings"
 	"time"
 
-	"golang.org/x/crypto/scrypt"
+	"golang.org/x/crypto/argon2"
 )
 
-// chk comprueba y sale si hay errores (ahorra escritura en programas sencillos)
-func chk(e error) {
-	if e != nil {
-		panic(e)
-	}
+type PasswordConfig struct {
+	time    uint32
+	memory  uint32
+	threads uint8
+	keyLen  uint32
 }
 
 // ejemplo de tipo para un usuario
@@ -34,6 +37,51 @@ type user struct {
 	Data  map[string]string // datos adicionales del usuario
 }
 
+// chk comprueba y sale si hay errores (ahorra escritura en programas sencillos)
+func chk(e error) {
+	if e != nil {
+		panic(e)
+	}
+}
+
+func generatePassword(c *PasswordConfig, password []byte, salt *[]byte) []byte {
+	hash := argon2.IDKey(password, *salt, c.time, c.memory, c.threads, c.keyLen)
+	nuevaSalt := base64.RawStdEncoding.EncodeToString(*salt)
+	nuevoHash := base64.RawStdEncoding.EncodeToString(hash)
+
+	*salt = []byte(nuevaSalt)
+	hash = []byte(nuevoHash)
+	format := "$argon2id$v=%d$m=%d,t=%d,p=%d$%s$%s"
+
+	return []byte(fmt.Sprintf(format, argon2.Version, c.memory, c.time, c.threads, *salt, hash))
+}
+
+func comparePassword(password []byte, hash []byte) bool {
+	hashString := string(hash)
+	trozos := strings.Split(hashString, "$")
+	c := &PasswordConfig{}
+
+	_, err := fmt.Sscanf(trozos[3], "m=%d,t=%d,p=%d", &c.memory, &c.time, &c.threads)
+	if err != nil {
+		return false
+	}
+
+	salt, err := base64.RawStdEncoding.DecodeString(trozos[4])
+	if err != nil {
+		return false
+	}
+
+	decodedHash, err := base64.RawStdEncoding.DecodeString(trozos[5])
+	if err != nil {
+		return false
+	}
+	c.keyLen = uint32(len(decodedHash))
+
+	comparisonHash := argon2.IDKey(password, salt, c.time, c.memory, c.threads, c.keyLen)
+
+	return (subtle.ConstantTimeCompare(decodedHash, comparisonHash) == 1)
+}
+
 // mapa con todos los usuarios
 // (se podría serializar con JSON o Gob, etc. y escribir/leer de disco para persistencia)
 var gUsers map[string]user
@@ -42,14 +90,19 @@ var gUsers map[string]user
 func Run() {
 
 	gUsers = make(map[string]user) // inicializamos mapa de usuarios
-
-	http.HandleFunc("/", handler) // asignamos un handler global
+	http.HandleFunc("/", handler)  // asignamos un handler global
 
 	// escuchamos el puerto 10443 con https y comprobamos el error
 	chk(http.ListenAndServeTLS(":10443", "localhost.crt", "localhost.key", nil))
 }
 
 func handler(w http.ResponseWriter, req *http.Request) {
+	config := &PasswordConfig{
+		time:    1,
+		memory:  64 * 1024,
+		threads: 4,
+		keyLen:  32,
+	}
 	req.ParseForm()                              // es necesario parsear el formulario
 	w.Header().Set("Content-Type", "text/plain") // cabecera estándar
 
@@ -73,8 +126,8 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		password := util.Decode64(req.Form.Get("pass")) // contraseña (keyLogin)
 
 		// "hasheamos" la contraseña con scrypt (argon2 es mejor)
-		u.Hash, _ = scrypt.Key(password, u.Salt, 16384, 8, 1, 32)
-
+		//u.Hash, _ = scrypt.Key(password, u.Salt, 16384, 8, 1, 32)
+		u.Hash = generatePassword(config, password, &u.Salt)
 		u.Seen = time.Now()        // asignamos tiempo de login
 		u.Token = make([]byte, 16) // token (16 bytes == 128 bits)
 		rand.Read(u.Token)         // el token es aleatorio
@@ -89,9 +142,9 @@ func handler(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 
-		password := util.Decode64(req.Form.Get("pass"))          // obtenemos la contraseña (keyLogin)
-		hash, _ := scrypt.Key(password, u.Salt, 16384, 8, 1, 32) // scrypt de keyLogin (argon2 es mejor)
-		if !bytes.Equal(u.Hash, hash) {                          // comparamos
+		password := util.Decode64(req.Form.Get("pass")) // obtenemos la contraseña (keyLogin)
+		//hash, _ := scrypt.Key(password, u.Salt, 16384, 8, 1, 32) // scrypt de keyLogin (argon2 es mejor)
+		if !comparePassword(password, u.Hash) { // comparamos
 			response(w, false, "Credenciales inválidas", nil)
 
 		} else {
