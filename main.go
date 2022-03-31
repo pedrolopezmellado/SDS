@@ -35,8 +35,8 @@ package main
 import (
 	"fmt"
 	"os"
-	"sdshttp/cli"
-	"sdshttp/srv"
+	"sdspractica/cli"
+	"sdspractica/srv"
 )
 
 /*
