@@ -8,6 +8,7 @@
 
 directorio Directorio
 
+
 - Directorio
 
 nombre string
@@ -15,6 +16,7 @@ nombre string
 carpetas map[Directorio]
 
 ficheros map[Fichero]
+
 
 - Fichero
 
