@@ -16,6 +16,7 @@ import (
 	"os"
 	"sdspractica/srv"
 	"sdspractica/util"
+	"strings"
 )
 
 // chk comprueba y sale si hay errores (ahorra escritura en programas sencillos)
@@ -67,10 +68,10 @@ func login(client *http.Client) {
 	usuario := ""
 	password := ""
 
-	fmt.Println("*** Login ***")
-	fmt.Println("Usuario: ")
+	fmt.Println("\n*** Login ***")
+	fmt.Print("Usuario: ")
 	fmt.Scanln(&usuario)
-	fmt.Println("Contraseña: ")
+	fmt.Print("Contraseña: ")
 	fmt.Scanln(&password)
 
 	data := url.Values{}
@@ -87,7 +88,82 @@ func login(client *http.Client) {
 	resp := srv.Resp{}
 	json.NewDecoder(r.Body).Decode(&resp) // decodificamos la respuesta para utilizar sus campos más adelante
 	fmt.Println(resp)                     // imprimimos por pantalla
-	r.Body.Close()                        // hay que cerrar el reader del body
+	if resp.Ok {
+		menuLogin()
+	}
+	r.Body.Close() // hay que cerrar el reader del body
+}
+
+func menuLogin() {
+
+	cadena := ""
+
+	for strings.Split(cadena, " ")[0] != "exit" {
+		fmt.Println("\n*** Home ***")
+		fmt.Print("Ruta: \n\n")
+		fmt.Println("Introduce 'help' para obtener información de los comandos")
+		fmt.Print("$ ")
+		fmt.Scanln(&cadena)
+		accionComando(cadena)
+	}
+}
+
+func accionComando(cadena string) {
+
+	comando := strings.Split(cadena, " ")[0]
+
+	switch comando {
+	case "help":
+		helpComando()
+	case "ls":
+		fmt.Println("es ls")
+		break
+	case "cd":
+		//accion_cd()
+		break
+	case "mkdir":
+		//accion_mkdir()
+		break
+	case "touch":
+		//accion_touch()
+		break
+	case "cat":
+		//accion_cat()
+		break
+	case "upload":
+		//accion_upload()
+		break
+	case "delete":
+		//accion_delete()
+	case "share":
+		//accion_share()
+		break
+	default:
+		fmt.Println("es otro")
+		break
+	}
+}
+
+func helpComando() {
+
+	// NO CAMBIAR -- SE MUESTRAN BIEN
+	comandosHelp :=
+		`
+*** Comandos ***
+	
+ls 						Muestra los ficheros que se encuentren en la ruta
+cd [nombre_carpeta] 				Navega a la carpeta con ese nombre
+cd ..						Navega a la carpeta anterior
+mkdir [nombre_carpeta]				Crea una carpeta en la ruta
+touch [nombre_fichero] 				Crea un fichero en la ruta
+cat [nombre_fichero] 				Muestra el contenido del fichero
+upload [ruta] [nombre_fichero]			Sube un fichero a partir de una ruta
+delete [nombre_fichero]				Elimina un fichero
+share [nombre_fichero] [nombre_usuario]		Comparte el fichero con otro usuario
+
+`
+	fmt.Print(comandosHelp)
+
 }
 
 // Run gestiona el modo cliente
@@ -109,6 +185,7 @@ func Run() {
 `
 	for opcion != 3 {
 		fmt.Print(menu)
+		fmt.Print("Opcion: ")
 		fmt.Scanln(&opcion)
 
 		/* creamos un cliente especial que no comprueba la validez de los certificados
