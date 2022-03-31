@@ -27,14 +27,25 @@ type PasswordConfig struct {
 	keyLen  uint32
 }
 
+type directorio struct {
+	nombre   string
+	carpetas map[string]directorio
+}
+
+type fichero struct {
+	nombre    string
+	contenido string
+}
+
 // ejemplo de tipo para un usuario
 type user struct {
-	Name  string            // nombre de usuario
-	Hash  []byte            // hash de la contraseña
-	Salt  []byte            // sal para la contraseña
-	Token []byte            // token de sesión
-	Seen  time.Time         // última vez que fue visto
-	Data  map[string]string // datos adicionales del usuario
+	Name       string            // nombre de usuario
+	Hash       []byte            // hash de la contraseña
+	Salt       []byte            // sal para la contraseña
+	Token      []byte            // token de sesión
+	Seen       time.Time         // última vez que fue visto
+	Data       map[string]string // datos adicionales del usuario
+	Directorio directorio        // directorio del usuario
 }
 
 // chk comprueba y sale si hay errores (ahorra escritura en programas sencillos)
@@ -117,7 +128,8 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		}
 
 		u := user{}
-		u.Name = req.Form.Get("user")                   // nombre
+		u.Name = req.Form.Get("user") // nombre
+		u.Directorio.nombre = u.Name
 		u.Salt = make([]byte, 16)                       // sal (16 bytes == 128 bits)
 		rand.Read(u.Salt)                               // la sal es aleatoria
 		u.Data = make(map[string]string)                // reservamos mapa de datos de usuario
