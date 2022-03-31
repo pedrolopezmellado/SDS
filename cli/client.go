@@ -19,6 +19,18 @@ import (
 	"strings"
 )
 
+var rutaUsuario string
+
+type directorio struct {
+	nombre   string
+	carpetas map[string]directorio
+}
+
+type fichero struct {
+	nombre    string
+	contenido string
+}
+
 // chk comprueba y sale si hay errores (ahorra escritura en programas sencillos)
 func chk(e error) {
 	if e != nil {
@@ -89,6 +101,7 @@ func login(client *http.Client) {
 	json.NewDecoder(r.Body).Decode(&resp) // decodificamos la respuesta para utilizar sus campos más adelante
 	fmt.Println(resp)                     // imprimimos por pantalla
 	if resp.Ok {
+		rutaUsuario = "/" + usuario
 		menuLogin()
 	}
 	r.Body.Close() // hay que cerrar el reader del body
@@ -100,8 +113,8 @@ func menuLogin() {
 
 	for strings.Split(cadena, " ")[0] != "exit" {
 		fmt.Println("\n*** Home ***")
-		fmt.Print("Ruta: \n\n")
-		fmt.Println("Introduce 'help' para obtener información de los comandos")
+		fmt.Print("Introduce 'help' para obtener información de los comandos\n\n")
+		fmt.Println(rutaUsuario)
 		fmt.Print("$ ")
 		fmt.Scanln(&cadena)
 		accionComando(cadena)
