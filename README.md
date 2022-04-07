@@ -40,3 +40,6 @@ Al logearse aparece siempre en la ruta /usuario.nombre
 - ls 
 - touch (nombreFichero)
 - cat (nombreFichero)
+- upload (rutaFichero, nombreFichero)
+- delete (nombreFichero)
+- share (nombreFichero, nombreUsuario)

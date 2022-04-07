@@ -23,17 +23,6 @@ import (
 
 var usuarioActual string
 
-type directorio struct {
-	nombre   string
-	carpetas map[string]directorio
-	ficheros map[string]fichero
-}
-
-type fichero struct {
-	nombre    string
-	contenido string
-}
-
 // chk comprueba y sale si hay errores (ahorra escritura en programas sencillos)
 func chk(e error) {
 	if e != nil {
@@ -104,13 +93,30 @@ func login(client *http.Client) {
 	json.NewDecoder(r.Body).Decode(&resp) // decodificamos la respuesta para utilizar sus campos más adelante
 	fmt.Println(resp)                     // imprimimos por pantalla
 	if resp.Ok {
+		menuLogin()
 		usuarioActual = usuario
-		menuLogin(client)
 	}
 	r.Body.Close() // hay que cerrar el reader del body
 }
 
-func menuLogin(client *http.Client) {
+func lsComando(client *http.Client) {
+	data := url.Values{}
+	data.Set("cmd", "ls")           // comando (string)
+	data.Set("user", usuarioActual) // usuario (string)
+
+	r, err := client.PostForm("https://localhost:10443", data) // enviamos por POST
+	chk(err)
+	resp := srv.Resp{}
+	json.NewDecoder(r.Body).Decode(&resp) // decodificamos la respuesta para utilizar sus campos más adelante
+	fmt.Println(resp)                     // imprimimos por pantalla
+	if resp.Ok {
+		fmt.Println("Directorios:")
+		fmt.Println(resp.Msg)
+	}
+	r.Body.Close() // hay que cerrar el reader del body
+}
+
+func menuLogin() {
 
 	cadena := ""
 
@@ -121,7 +127,7 @@ func menuLogin(client *http.Client) {
 		inputReader := bufio.NewReader(os.Stdin)
 		cadena, _ = inputReader.ReadString('\n')
 		fmt.Println(cadena)
-		accionComando(cadena, client)
+		accionComando(cadena)
 	}
 }
 
@@ -158,15 +164,23 @@ func uploadComando(ruta string, nombreFichero string, client *http.Client) {
 
 }
 
-func accionComando(cadena string, client *http.Client) {
-
-	comando := strings.Split(cadena, " ")[0]
+func accionComando(cadena string) {
+	trozos := strings.Split(cadena, " ")
+	comando := trozos[0]
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	client := &http.Client{Transport: tr}
 
 	switch comando {
 	case "help":
 		helpComando()
 	case "ls":
-		fmt.Println("es ls")
+		if len(trozos) > 1 {
+			fmt.Println("Este comando no acepta argumentos")
+		} else {
+			lsComando(client)
+		}
 		break
 	case "touch":
 		//accion_touch()
@@ -176,8 +190,8 @@ func accionComando(cadena string, client *http.Client) {
 		break
 	case "upload":
 		//fmt.Println(cadena)
-		ruta := strings.Split(cadena, " ")[1]
-		nombreFichero := strings.Split(cadena, " ")[2]
+		ruta := trozos[1]
+		nombreFichero := trozos[2]
 		uploadComando(ruta, nombreFichero, client)
 		break
 	case "delete":
