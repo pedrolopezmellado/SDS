@@ -29,7 +29,7 @@ type PasswordConfig struct {
 
 type directorio struct {
 	nombre   string
-	carpetas map[string]directorio
+	ficheros map[string]fichero
 }
 
 type fichero struct {

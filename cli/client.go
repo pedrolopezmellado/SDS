@@ -24,6 +24,7 @@ var rutaUsuario string
 type directorio struct {
 	nombre   string
 	carpetas map[string]directorio
+	ficheros map[string]fichero
 }
 
 type fichero struct {
@@ -101,7 +102,6 @@ func login(client *http.Client) {
 	json.NewDecoder(r.Body).Decode(&resp) // decodificamos la respuesta para utilizar sus campos más adelante
 	fmt.Println(resp)                     // imprimimos por pantalla
 	if resp.Ok {
-		rutaUsuario = "/" + usuario
 		menuLogin()
 	}
 	r.Body.Close() // hay que cerrar el reader del body
@@ -114,7 +114,6 @@ func menuLogin() {
 	for strings.Split(cadena, " ")[0] != "exit" {
 		fmt.Println("\n*** Home ***")
 		fmt.Print("Introduce 'help' para obtener información de los comandos\n\n")
-		fmt.Println(rutaUsuario)
 		fmt.Print("$ ")
 		fmt.Scanln(&cadena)
 		accionComando(cadena)
@@ -130,12 +129,6 @@ func accionComando(cadena string) {
 		helpComando()
 	case "ls":
 		fmt.Println("es ls")
-		break
-	case "cd":
-		//accion_cd()
-		break
-	case "mkdir":
-		//accion_mkdir()
 		break
 	case "touch":
 		//accion_touch()
@@ -165,9 +158,6 @@ func helpComando() {
 *** Comandos ***
 	
 ls 						Muestra los ficheros que se encuentren en la ruta
-cd [nombre_carpeta] 				Navega a la carpeta con ese nombre
-cd ..						Navega a la carpeta anterior
-mkdir [nombre_carpeta]				Crea una carpeta en la ruta
 touch [nombre_fichero] 				Crea un fichero en la ruta
 cat [nombre_fichero] 				Muestra el contenido del fichero
 upload [ruta] [nombre_fichero]			Sube un fichero a partir de una ruta
