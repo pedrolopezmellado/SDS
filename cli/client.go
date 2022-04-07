@@ -19,22 +19,7 @@ import (
 	"strings"
 )
 
-var rutaUsuario string
-
-type directorio struct {
-	nombre   string
-	ficheros map[string]fichero
-}
-
-type user struct {
-	Name       string            // nombre de usuario
-	Hash       []byte            // hash de la contraseña
-	Salt       []byte            // sal para la contraseña
-	Token      []byte            // token de sesión
-	Seen       time.Time         // última vez que fue visto
-	Data       map[string]string // datos adicionales del usuario
-	Directorio directorio        // directorio del usuario
-}
+var usuarioActual string
 
 // chk comprueba y sale si hay errores (ahorra escritura en programas sencillos)
 func chk(e error) {
@@ -107,6 +92,24 @@ func login(client *http.Client) {
 	fmt.Println(resp)                     // imprimimos por pantalla
 	if resp.Ok {
 		menuLogin()
+		usuarioActual = usuario
+	}
+	r.Body.Close() // hay que cerrar el reader del body
+}
+
+func lsComando(client *http.Client) {
+	data := url.Values{}
+	data.Set("cmd", "ls")           // comando (string)
+	data.Set("user", usuarioActual) // usuario (string)
+
+	r, err := client.PostForm("https://localhost:10443", data) // enviamos por POST
+	chk(err)
+	resp := srv.Resp{}
+	json.NewDecoder(r.Body).Decode(&resp) // decodificamos la respuesta para utilizar sus campos más adelante
+	fmt.Println(resp)                     // imprimimos por pantalla
+	if resp.Ok {
+		fmt.Println("Directorios:")
+		fmt.Println(resp.Msg)
 	}
 	r.Body.Close() // hay que cerrar el reader del body
 }
@@ -124,26 +127,23 @@ func menuLogin() {
 	}
 }
 
-func cdComando(trozos []string) {
-	if len(trozos) == 1 {
-		rutaUsuario = "/" + 
-	} else if len(trozos) == 2 {
-		//le pasaremos al servidor la ruta actual /pedro/home y la carpeta a la que queremos ir carpeta1
-	} else {
-
-	}
-
-}
-
 func accionComando(cadena string) {
 	trozos := strings.Split(cadena, " ")
 	comando := trozos[0]
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	client := &http.Client{Transport: tr}
 
 	switch comando {
 	case "help":
 		helpComando()
 	case "ls":
-		fmt.Println("es ls")
+		if len(trozos) > 1 {
+			fmt.Println("Este comando no acepta argumentos")
+		} else {
+			lsComando(client)
+		}
 		break
 	case "touch":
 		//accion_touch()

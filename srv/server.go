@@ -188,6 +188,28 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		gUsers[u.Name] = u
 		response(w, true, string(datos), u.Token)
 
+	case "ls":
+		u, ok := gUsers[req.Form.Get("user")] // ¿existe ya el usuario?
+		if !ok {
+			response(w, false, "No autentificado", nil)
+			return
+		} else if (u.Token == nil) || (time.Since(u.Seen).Minutes() > 60) {
+			// sin token o con token expirado
+			response(w, false, "No autentificado", nil)
+			return
+		} else {
+			var nombres []string
+			var mensaje string
+			for nombre := range u.Directorio.ficheros {
+				nombres = append(nombres, nombre)
+			}
+			if len(nombres) == 0 {
+				mensaje = "Tu directorio no contiene ficheros actualmente"
+			} else {
+				mensaje = strings.Join(nombres, " ")
+			}
+			response(w, true, mensaje, u.Token)
+		}
 	default:
 		response(w, false, "Comando no implementado", nil)
 	}
