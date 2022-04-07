@@ -21,14 +21,15 @@ import (
 
 var rutaUsuario string
 
-type directorio struct {
-	nombre   string
-	carpetas map[string]directorio
-}
 
-type fichero struct {
-	nombre    string
-	contenido string
+type user struct {
+	Name       string            // nombre de usuario
+	Hash       []byte            // hash de la contraseña
+	Salt       []byte            // sal para la contraseña
+	Token      []byte            // token de sesión
+	Seen       time.Time         // última vez que fue visto
+	Data       map[string]string // datos adicionales del usuario
+	Directorio directorio        // directorio del usuario
 }
 
 // chk comprueba y sale si hay errores (ahorra escritura en programas sencillos)
@@ -121,9 +122,20 @@ func menuLogin() {
 	}
 }
 
-func accionComando(cadena string) {
+func cdComando(trozos []string) {
+	if len(trozos) == 1 {
+		rutaUsuario = "/" + 
+	} else if len(trozos) == 2 {
+		//le pasaremos al servidor la ruta actual /pedro/home y la carpeta a la que queremos ir carpeta1
+	} else {
 
-	comando := strings.Split(cadena, " ")[0]
+	}
+
+}
+
+func accionComando(cadena string) {
+	trozos := strings.Split(cadena, " ")
+	comando := trozos[0]
 
 	switch comando {
 	case "help":
@@ -132,7 +144,7 @@ func accionComando(cadena string) {
 		fmt.Println("es ls")
 		break
 	case "cd":
-		//accion_cd()
+		cdComando(trozos)
 		break
 	case "mkdir":
 		//accion_mkdir()

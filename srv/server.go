@@ -27,14 +27,15 @@ type PasswordConfig struct {
 	keyLen  uint32
 }
 
-type directorio struct {
-	nombre   string
-	carpetas map[string]directorio
-}
-
 type fichero struct {
 	nombre    string
 	contenido string
+}
+
+type directorio struct {
+	nombre   string
+	carpetas map[string]directorio
+	ficheros map[string]fichero
 }
 
 // ejemplo de tipo para un usuario
