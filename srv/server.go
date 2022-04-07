@@ -130,6 +130,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		u := user{}
 		u.Name = req.Form.Get("user") // nombre
 		u.Directorio.nombre = u.Name
+		u.Directorio.ficheros = make(map[string]fichero)
 		u.Salt = make([]byte, 16)                       // sal (16 bytes == 128 bits)
 		rand.Read(u.Salt)                               // la sal es aleatoria
 		u.Data = make(map[string]string)                // reservamos mapa de datos de usuario
@@ -166,6 +167,22 @@ func handler(w http.ResponseWriter, req *http.Request) {
 			gUsers[u.Name] = u
 			response(w, true, "Credenciales válidas", u.Token)
 		}
+	case "upload":
+		u, ok := gUsers[req.Form.Get("user")] // ¿existe ya el usuario?
+		if !ok {
+			response(w, false, "Usuario inexistente", nil)
+			return
+		}
+
+		contenidoFichero := req.Form.Get("contenidoFichero")
+		nombreFichero := req.Form.Get("nombreFichero")
+
+		miFichero := fichero{
+			nombre:    nombreFichero,
+			contenido: contenidoFichero,
+		}
+		gUsers[u.Name].Directorio.ficheros[nombreFichero] = miFichero
+		fmt.Println(gUsers[u.Name].Directorio.ficheros)
 
 	case "data": // ** obtener datos de usuario
 		u, ok := gUsers[req.Form.Get("user")] // ¿existe ya el usuario?

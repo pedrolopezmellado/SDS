@@ -4,6 +4,7 @@ Cliente
 package cli
 
 import (
+	"bufio"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha512"
@@ -11,6 +12,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
@@ -19,7 +21,7 @@ import (
 	"strings"
 )
 
-var rutaUsuario string
+var usuarioActual string
 
 type directorio struct {
 	nombre   string
@@ -102,12 +104,13 @@ func login(client *http.Client) {
 	json.NewDecoder(r.Body).Decode(&resp) // decodificamos la respuesta para utilizar sus campos más adelante
 	fmt.Println(resp)                     // imprimimos por pantalla
 	if resp.Ok {
-		menuLogin()
+		usuarioActual = usuario
+		menuLogin(client)
 	}
 	r.Body.Close() // hay que cerrar el reader del body
 }
 
-func menuLogin() {
+func menuLogin(client *http.Client) {
 
 	cadena := ""
 
@@ -115,12 +118,47 @@ func menuLogin() {
 		fmt.Println("\n*** Home ***")
 		fmt.Print("Introduce 'help' para obtener información de los comandos\n\n")
 		fmt.Print("$ ")
-		fmt.Scanln(&cadena)
-		accionComando(cadena)
+		inputReader := bufio.NewReader(os.Stdin)
+		cadena, _ = inputReader.ReadString('\n')
+		fmt.Println(cadena)
+		accionComando(cadena, client)
 	}
 }
 
-func accionComando(cadena string) {
+func uploadComando(ruta string, nombreFichero string, client *http.Client) {
+	// ** ejemplo de registro
+	data := url.Values{}      // estructura para contener los valores
+	data.Set("cmd", "upload") // comando (string)
+	fmt.Println(usuarioActual)
+	data.Set("user", usuarioActual) // usuario (string)
+	dir, err := os.Getwd()
+	fmt.Println(dir)
+	file, err := ioutil.ReadFile("./ficheros/" + ruta)
+	if err != nil {
+		fmt.Println(err)
+	} else {
+		fmt.Println(string(file))
+
+		data.Set("contenidoFichero", string(file)) // usuario (string)
+		data.Set("nombreFichero", nombreFichero)
+
+		r, err := client.PostForm("https://localhost:10443", data) // enviamos por POST
+		chk(err)
+		resp := srv.Resp{}
+		json.NewDecoder(r.Body).Decode(&resp) // decodificamos la respuesta para utilizar sus campos más adelante
+		fmt.Println(resp)                     // imprimimos por pantalla
+		if resp.Ok {
+
+		}
+		r.Body.Close() // hay que cerrar el reader del body
+
+		// imprimir el string
+		//fmt.Println(datosComoString)
+	}
+
+}
+
+func accionComando(cadena string, client *http.Client) {
 
 	comando := strings.Split(cadena, " ")[0]
 
@@ -137,7 +175,10 @@ func accionComando(cadena string) {
 		//accion_cat()
 		break
 	case "upload":
-		//accion_upload()
+		//fmt.Println(cadena)
+		ruta := strings.Split(cadena, " ")[1]
+		nombreFichero := strings.Split(cadena, " ")[2]
+		uploadComando(ruta, nombreFichero, client)
 		break
 	case "delete":
 		//accion_delete()
