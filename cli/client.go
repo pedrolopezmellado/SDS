@@ -18,6 +18,7 @@ import (
 	"os"
 	"sdspractica/srv"
 	"sdspractica/util"
+	"strconv"
 	"strings"
 )
 
@@ -93,13 +94,14 @@ func login(client *http.Client) {
 	json.NewDecoder(r.Body).Decode(&resp) // decodificamos la respuesta para utilizar sus campos más adelante
 	fmt.Println(resp)                     // imprimimos por pantalla
 	if resp.Ok {
-		menuLogin()
 		usuarioActual = usuario
+		menuLogin()
 	}
 	r.Body.Close() // hay que cerrar el reader del body
 }
 
 func lsComando(client *http.Client) {
+	fmt.Println("entra en ls")
 	data := url.Values{}
 	data.Set("cmd", "ls")           // comando (string)
 	data.Set("user", usuarioActual) // usuario (string)
@@ -126,7 +128,6 @@ func menuLogin() {
 		fmt.Print("$ ")
 		inputReader := bufio.NewReader(os.Stdin)
 		cadena, _ = inputReader.ReadString('\n')
-		fmt.Println(cadena)
 		accionComando(cadena)
 	}
 }
@@ -166,12 +167,22 @@ func uploadComando(ruta string, nombreFichero string, client *http.Client) {
 
 func accionComando(cadena string) {
 	trozos := strings.Split(cadena, " ")
-	comando := trozos[0]
+	fmt.Println("trozos: " + trozos[0])
+	comando := cadena
+	fmt.Println(comando)
+	fmt.Println("len de cadena: " + strconv.Itoa(len(cadena)))
+	fmt.Println("len de comando: " + strconv.Itoa(len(comando)))
+	if len(trozos) == 1 {
+		fmt.Println("comando antes: " + comando)
+		comando = strings.Split(comando, "\n")[0]
+		fmt.Println("comando despues: " + comando)
+	}
+	fmt.Println(comando)
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
 	client := &http.Client{Transport: tr}
-
+	fmt.Println(comando)
 	switch comando {
 	case "help":
 		helpComando()
