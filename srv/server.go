@@ -298,12 +298,18 @@ func handler(w http.ResponseWriter, req *http.Request) {
 			response(w, false, "No autentificado", nil)
 			return
 		} else {
-			var nombres []string
-			for Name := range gUsers {
-				nombres = append(nombres, Name)
+			directorio := req.Form.Get("directorio")
+			existe := false
+			for nombre := range gUsers {
+				if nombre == directorio {
+					existe = true
+				}
 			}
-			mensaje := strings.Join(nombres, " ")
-			response(w, true, mensaje, u.Token)
+			if existe {
+				response(w, true, "/"+directorio, u.Token)
+			} else {
+				response(w, false, "El directorio no existe", u.Token)
+			}
 		}
 	case "share":
 		u, ok := gUsers[req.Form.Get("user")] // ¿existe ya el usuario?
