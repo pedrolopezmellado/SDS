@@ -22,6 +22,7 @@ import (
 )
 
 var usuarioActual string
+var ruta string
 
 // chk comprueba y sale si hay errores (ahorra escritura en programas sencillos)
 func chk(e error) {
@@ -94,6 +95,7 @@ func login(client *http.Client) {
 	fmt.Println(resp)                     // imprimimos por pantalla
 	if resp.Ok {
 		usuarioActual = usuario
+		ruta = "/" + usuarioActual
 		menuLogin()
 	}
 	r.Body.Close() // hay que cerrar el reader del body
@@ -103,9 +105,10 @@ func menuLogin() {
 
 	cadena := ""
 
-	for strings.Split(cadena, " ")[0] != "exit" {
+	for strings.Split(cadena, " ")[0] != "exit\n" {
 		fmt.Println("\n*** Home ***")
 		fmt.Print("Introduce 'help' para obtener información de los comandos\n\n")
+		fmt.Println("ruta: " + ruta)
 		fmt.Print("$ ")
 		inputReader := bufio.NewReader(os.Stdin)
 		cadena, _ = inputReader.ReadString('\n')
@@ -245,6 +248,50 @@ func deleteComando(nombreFichero string, client *http.Client) {
 	r.Body.Close() // hay que cerrar el reader del body
 }
 
+cdComando(directorio string, client *http.Client) {
+	// ** ejemplo de registro
+	data := url.Values{}            // estructura para contener los valores
+	data.Set("cmd", "cd")           // comando (string)
+	data.Set("user", usuarioActual) // usuario (string)
+
+	r, err := client.PostForm("https://localhost:10443", data) // enviamos por POST
+	chk(err)
+	resp := srv.Resp{}
+	json.NewDecoder(r.Body).Decode(&resp) // decodificamos la respuesta para utilizar sus campos más adelante
+	//fmt.Println(resp)                     // imprimimos por pantalla
+	if resp.Ok {
+		nombres := strings.Split(resp.Msg, " ")
+		for _, nombre := range nombres {
+			fmt.Println("/" + nombre)
+		}
+	} else {
+		fmt.Println(resp.Msg)
+	}
+	r.Body.Close() // hay que cerrar el reader del body
+}
+
+func paraTi(client *http.Client) {
+	// ** ejemplo de registro
+	data := url.Values{}            // estructura para contener los valores
+	data.Set("cmd", "cd")           // comando (string)
+	data.Set("user", usuarioActual) // usuario (string)
+
+	r, err := client.PostForm("https://localhost:10443", data) // enviamos por POST
+	chk(err)
+	resp := srv.Resp{}
+	json.NewDecoder(r.Body).Decode(&resp) // decodificamos la respuesta para utilizar sus campos más adelante
+	//fmt.Println(resp)                     // imprimimos por pantalla
+	if resp.Ok {
+		nombres := strings.Split(resp.Msg, " ")
+		for _, nombre := range nombres {
+			fmt.Println("/" + nombre)
+		}
+	} else {
+		fmt.Println(resp.Msg)
+	}
+	r.Body.Close() // hay que cerrar el reader del body
+}
+
 func accionComando(cadena string) {
 	var moreCommands = true
 	trozos := strings.Split(cadena, " ")
@@ -274,8 +321,14 @@ func accionComando(cadena string) {
 		}
 		break
 	case "cd":
-		break
-	case "cd ..":
+		if moreCommands {
+			directorio := trozos[1]
+			cdComando(directorio, client)
+		} else {
+			ruta = "/"
+
+		}
+
 		break
 	case "touch":
 		if !moreCommands {
