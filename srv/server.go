@@ -326,6 +326,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		}
 	case "public":
 		u, ok := gUsers[req.Form.Get("user")] // ¿existe ya el usuario?
+
 		if !ok {
 			response(w, false, "No autentificado", nil)
 			return
@@ -335,6 +336,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
 			return
 		} else {
 			nombreFichero := req.Form.Get("nombreFichero")
+			nombreFichero = nombreFichero[:len(nombreFichero)-2]
 			fichero, ok := gUsers[u.Name].Directorio.ficheros[nombreFichero]
 			if !ok {
 				response(w, false, "No existe ningún fichero con ese nombre", u.Token)
@@ -344,6 +346,29 @@ func handler(w http.ResponseWriter, req *http.Request) {
 				gUsers[u.Name].Directorio.ficheros[nombreFichero] = fichero
 			}
 			response(w, true, "Ahora "+nombreFichero+" es público", u.Token)
+		}
+	case "private":
+		u, ok := gUsers[req.Form.Get("user")] // ¿existe ya el usuario?
+		if !ok {
+			response(w, false, "No autentificado", nil)
+			return
+		} else if (u.Token == nil) || (time.Since(u.Seen).Minutes() > 60) {
+			// sin token o con token expirado
+			response(w, false, "No autentificado", nil)
+			return
+		} else {
+			nombreFichero := req.Form.Get("nombreFichero")
+			nombreFichero = nombreFichero[:len(nombreFichero)-2]
+			fichero, ok := gUsers[u.Name].Directorio.ficheros[nombreFichero]
+			if !ok {
+				response(w, false, "No existe ningún fichero con ese nombre", u.Token)
+				return
+			} else {
+				fichero.public = false
+				gUsers[u.Name].Directorio.ficheros[nombreFichero] = fichero
+				fmt.Println(gUsers[u.Name].Directorio.ficheros)
+			}
+			response(w, true, "Ahora "+nombreFichero+" es privado", u.Token)
 		}
 	default:
 		response(w, false, "Comando no implementado", nil)

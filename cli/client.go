@@ -205,6 +205,20 @@ func publicComando(nombreFichero string, client *http.Client) {
 	r.Body.Close() // hay que cerrar el reader del body*/
 }
 
+func privateComando(nombreFichero string, client *http.Client) {
+	data := url.Values{}
+	data.Set("cmd", "private")      // comando (string)
+	data.Set("user", usuarioActual) // usuario (string)
+	data.Set("nombreFichero", nombreFichero)
+
+	r, err := client.PostForm("https://localhost:10443", data) // enviamos por POST
+	chk(err)
+	resp := srv.Resp{}
+	json.NewDecoder(r.Body).Decode(&resp) // decodificamos la respuesta para utilizar sus campos más adelante
+	fmt.Println(resp.Msg)
+	r.Body.Close() // hay que cerrar el reader del body*/
+}
+
 func catComando(nombreFichero string, client *http.Client) {
 	// ** ejemplo de registro
 	data := url.Values{}                     // estructura para contener los valores
@@ -340,6 +354,16 @@ func accionComando(cadena string) {
 		}
 		break
 	case "private":
+		if !moreCommands {
+			fmt.Println("Debes introducir el nombre del fichero como argumento")
+		} else {
+			if len(trozos) > 2 {
+				fmt.Println("Debes introducir el nombre del fichero únicamente")
+			} else {
+				nombreFichero := trozos[1]
+				privateComando(nombreFichero, client)
+			}
+		}
 		break
 	default:
 		fmt.Println("Ese comando no existe")
