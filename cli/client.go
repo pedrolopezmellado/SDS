@@ -117,9 +117,14 @@ func menuLogin() {
 }
 
 func lsComando(client *http.Client) {
+	//casos:
+	//mostrar los directorios de todos los usuarios si estas en el directorio raiz
+	//si estas en el directorio de otro usuario mostrar sus ficheros y publicos y los compartidos contigo
+	//si estas en tu propio directorio mostrar todo su contenido
 	data := url.Values{}
 	data.Set("cmd", "ls")           // comando (string)
 	data.Set("user", usuarioActual) // usuario (string)
+	data.Set("ruta", ruta)
 
 	r, err := client.PostForm("https://localhost:10443", data) // enviamos por POST
 	chk(err)
@@ -262,7 +267,7 @@ func deleteComando(nombreFichero string, client *http.Client) {
 	r.Body.Close() // hay que cerrar el reader del body
 }
 
-cdComando(directorio string, client *http.Client) {
+/*func cdComando(directorio string, client *http.Client) {
 	// ** ejemplo de registro
 	data := url.Values{}            // estructura para contener los valores
 	data.Set("cmd", "cd")           // comando (string)
@@ -282,7 +287,7 @@ cdComando(directorio string, client *http.Client) {
 		fmt.Println(resp.Msg)
 	}
 	r.Body.Close() // hay que cerrar el reader del body
-}
+}*/
 
 func paraTi(client *http.Client) {
 	// ** ejemplo de registro
@@ -336,13 +341,11 @@ func accionComando(cadena string) {
 		break
 	case "cd":
 		if moreCommands {
-			directorio := trozos[1]
-			cdComando(directorio, client)
+			//directorio := trozos[1]
+			//cdComando(directorio, client)
 		} else {
 			ruta = "/"
-
 		}
-
 		break
 	case "touch":
 		if !moreCommands {
