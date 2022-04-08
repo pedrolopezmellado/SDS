@@ -18,7 +18,6 @@ import (
 	"os"
 	"sdspractica/srv"
 	"sdspractica/util"
-	"strconv"
 	"strings"
 )
 
@@ -166,28 +165,29 @@ func uploadComando(ruta string, nombreFichero string, client *http.Client) {
 }
 
 func accionComando(cadena string) {
+	var moreCommands = true
 	trozos := strings.Split(cadena, " ")
-	fmt.Println("trozos: " + trozos[0])
-	comando := cadena
-	fmt.Println(comando)
-	fmt.Println("len de cadena: " + strconv.Itoa(len(cadena)))
-	fmt.Println("len de comando: " + strconv.Itoa(len(comando)))
+	comando := trozos[0]
+
 	if len(trozos) == 1 {
-		fmt.Println("comando antes: " + comando)
-		comando = strings.Split(comando, "\n")[0]
-		fmt.Println("comando despues: " + comando)
+		moreCommands = false
+		comando = comando[:len(comando)-2]
 	}
-	fmt.Println(comando)
+
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
 	client := &http.Client{Transport: tr}
-	fmt.Println(comando)
+
 	switch comando {
 	case "help":
-		helpComando()
+		if moreCommands {
+			fmt.Println("Este comando no acepta argumentos")
+		} else {
+			helpComando()
+		}
 	case "ls":
-		if len(trozos) > 1 {
+		if moreCommands {
 			fmt.Println("Este comando no acepta argumentos")
 		} else {
 			lsComando(client)
@@ -200,7 +200,6 @@ func accionComando(cadena string) {
 		//accion_cat()
 		break
 	case "upload":
-		//fmt.Println(cadena)
 		ruta := trozos[1]
 		nombreFichero := trozos[2]
 		uploadComando(ruta, nombreFichero, client)
@@ -211,7 +210,7 @@ func accionComando(cadena string) {
 		//accion_share()
 		break
 	default:
-		fmt.Println("es otro")
+		fmt.Println("Ese comando no existe")
 		break
 	}
 }
