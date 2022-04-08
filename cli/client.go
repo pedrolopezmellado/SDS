@@ -98,6 +98,7 @@ func login(client *http.Client) {
 }
 
 func lsComando(client *http.Client) {
+	fmt.Println("sssss")
 	data := url.Values{}
 	data.Set("cmd", "ls")           // comando (string)
 	data.Set("user", usuarioActual) // usuario (string)
