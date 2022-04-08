@@ -177,12 +177,48 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		contenidoFichero := req.Form.Get("contenidoFichero")
 		nombreFichero := req.Form.Get("nombreFichero")
 
+		ficheroActual, okFichero := gUsers[u.Name].Directorio.ficheros[nombreFichero]
+		if okFichero {
+			response(w, false, "El fichero "+ficheroActual.nombre+" ya existe", u.Token)
+			return
+		}
+
 		miFichero := fichero{
 			nombre:    nombreFichero,
 			contenido: contenidoFichero,
 		}
 		gUsers[u.Name].Directorio.ficheros[nombreFichero] = miFichero
-		fmt.Println(gUsers[u.Name].Directorio.ficheros)
+		mensaje := "Fichero subido correctamente"
+		response(w, true, mensaje, u.Token)
+
+	case "cat":
+		u, ok := gUsers[req.Form.Get("user")] // ¿existe ya el usuario?
+		if !ok {
+			response(w, false, "Usuario inexistente", nil)
+			return
+		}
+		nombreFichero := req.Form.Get("nombreFichero")
+		fichero, okFichero := gUsers[u.Name].Directorio.ficheros[nombreFichero]
+		if !okFichero {
+			response(w, false, "El fichero no existe", u.Token)
+			return
+		}
+		response(w, true, fichero.contenido, u.Token)
+
+	case "delete":
+		u, ok := gUsers[req.Form.Get("user")] // ¿existe ya el usuario?
+		if !ok {
+			response(w, false, "Usuario inexistente", nil)
+			return
+		}
+		nombreFichero := req.Form.Get("nombreFichero")
+		fichero, okFichero := gUsers[u.Name].Directorio.ficheros[nombreFichero]
+		if !okFichero {
+			response(w, false, "El fichero no existe", u.Token)
+			return
+		}
+		delete(gUsers[u.Name].Directorio.ficheros, fichero.nombre)
+		response(w, true, "Fichero eliminado correctamente", u.Token)
 
 	case "data": // ** obtener datos de usuario
 		u, ok := gUsers[req.Form.Get("user")] // ¿existe ya el usuario?
