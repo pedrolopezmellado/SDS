@@ -152,6 +152,8 @@ func uploadComando(ruta string, nombreFichero string, client *http.Client) {
 		//fmt.Println(resp)                     // imprimimos por pantalla
 		if resp.Ok {
 			fmt.Println(resp.Msg)
+		} else {
+			fmt.Println(resp.Msg)
 		}
 		r.Body.Close() // hay que cerrar el reader del body
 
@@ -195,11 +197,50 @@ func shareComando(nombreFichero string, usuario string, client *http.Client) {
 	r.Body.Close() // hay que cerrar el reader del body*/
 }
 
+func catComando(nombreFichero string, client *http.Client) {
+	// ** ejemplo de registro
+	data := url.Values{}                     // estructura para contener los valores
+	data.Set("cmd", "cat")                   // comando (string)
+	data.Set("user", usuarioActual)          // usuario (string)
+	data.Set("nombreFichero", nombreFichero) // nombre del fichero (string)
+
+	r, err := client.PostForm("https://localhost:10443", data) // enviamos por POST
+	chk(err)
+	resp := srv.Resp{}
+	json.NewDecoder(r.Body).Decode(&resp) // decodificamos la respuesta para utilizar sus campos más adelante
+	//fmt.Println(resp)                     // imprimimos por pantalla
+	if resp.Ok {
+		fmt.Println(resp.Msg)
+	} else {
+		fmt.Println(resp.Msg)
+	}
+	r.Body.Close() // hay que cerrar el reader del body
+}
+
+func deleteComando(nombreFichero string, client *http.Client) {
+	// ** ejemplo de registro
+	data := url.Values{}                     // estructura para contener los valores
+	data.Set("cmd", "delete")                // comando (string)
+	data.Set("user", usuarioActual)          // usuario (string)
+	data.Set("nombreFichero", nombreFichero) // nombre del fichero (string)
+
+	r, err := client.PostForm("https://localhost:10443", data) // enviamos por POST
+	chk(err)
+	resp := srv.Resp{}
+	json.NewDecoder(r.Body).Decode(&resp) // decodificamos la respuesta para utilizar sus campos más adelante
+	//fmt.Println(resp)                     // imprimimos por pantalla
+	if resp.Ok {
+		fmt.Println(resp.Msg)
+	} else {
+		fmt.Println(resp.Msg)
+	}
+	r.Body.Close() // hay que cerrar el reader del body
+}
+
 func accionComando(cadena string) {
 	var moreCommands = true
 	trozos := strings.Split(cadena, " ")
 	comando := trozos[0]
-
 	if len(trozos) == 1 {
 		moreCommands = false
 		comando = comando[:len(comando)-2]
@@ -237,15 +278,30 @@ func accionComando(cadena string) {
 		}
 		break
 	case "cat":
-		//accion_cat()
+		if len(trozos) != 2 {
+			fmt.Println("Error al introducir argumentos")
+		} else {
+			nombreFichero := trozos[1]
+			catComando(nombreFichero, client)
+		}
 		break
 	case "upload":
-		ruta := trozos[1]
-		nombreFichero := trozos[2]
-		uploadComando(ruta, nombreFichero, client)
+		if len(trozos) != 3 {
+			fmt.Println("Error al introducir argumentos")
+		} else {
+			ruta := trozos[1]
+			nombreFichero := trozos[2]
+			uploadComando(ruta, nombreFichero, client)
+		}
 		break
 	case "delete":
-		//accion_delete()
+		if len(trozos) != 2 {
+			fmt.Println("Error al introducir argumentos")
+		} else {
+			nombreFichero := trozos[1]
+			deleteComando(nombreFichero, client)
+		}
+		break
 	case "share":
 		if !moreCommands {
 			fmt.Println("Debes introducir el nombre del fichero y del usuario a compartir")
