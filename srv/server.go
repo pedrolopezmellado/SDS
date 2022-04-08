@@ -288,6 +288,23 @@ func handler(w http.ResponseWriter, req *http.Request) {
 			gUsers[u.Name].Directorio.ficheros[miFichero.nombre] = miFichero
 			response(w, true, "Fichero creado", u.Token)
 		}
+	case "cd":
+		u, ok := gUsers[req.Form.Get("user")] // ¿existe ya el usuario?
+		if !ok {
+			response(w, false, "No autentificado", nil)
+			return
+		} else if (u.Token == nil) || (time.Since(u.Seen).Minutes() > 60) {
+			// sin token o con token expirado
+			response(w, false, "No autentificado", nil)
+			return
+		} else {
+			var nombres []string
+			for Name := range gUsers {
+				nombres = append(nombres, Name)
+			}
+			mensaje := strings.Join(nombres, " ")
+			response(w, true, mensaje, u.Token)
+		}
 	case "share":
 		u, ok := gUsers[req.Form.Get("user")] // ¿existe ya el usuario?
 		if !ok {
