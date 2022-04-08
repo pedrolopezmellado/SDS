@@ -28,8 +28,10 @@ type PasswordConfig struct {
 }
 
 type fichero struct {
-	nombre    string
-	contenido string
+	nombre      string
+	contenido   string
+	public      bool
+	sharedUsers map[string]user
 }
 
 type directorio struct {

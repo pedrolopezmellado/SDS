@@ -150,11 +150,7 @@ func uploadComando(ruta string, nombreFichero string, client *http.Client) {
 		resp := srv.Resp{}
 		json.NewDecoder(r.Body).Decode(&resp) // decodificamos la respuesta para utilizar sus campos más adelante
 		//fmt.Println(resp)                     // imprimimos por pantalla
-		if resp.Ok {
-			fmt.Println(resp.Msg)
-		} else {
-			fmt.Println(resp.Msg)
-		}
+		fmt.Println(resp.Msg)
 		r.Body.Close() // hay que cerrar el reader del body
 
 		// imprimir el string
@@ -265,6 +261,10 @@ func accionComando(cadena string) {
 			lsComando(client)
 		}
 		break
+	case "cd":
+		break
+	case "cd ..":
+		break
 	case "touch":
 		if !moreCommands {
 			fmt.Println("Debes introducir el nombre del fichero como argumento")
@@ -315,6 +315,8 @@ func accionComando(cadena string) {
 			}
 		}
 		break
+	case "public":
+		break
 	default:
 		fmt.Println("Ese comando no existe")
 		break
@@ -329,11 +331,14 @@ func helpComando() {
 *** Comandos ***
 	
 ls 						Muestra los ficheros que se encuentren en la ruta
+cd 						Te lleva al directorio raíz
+cd [nombre_usuario]				Te lleva al directorio del usuario				
 touch [nombre_fichero] 				Crea un fichero en la ruta
 cat [nombre_fichero] 				Muestra el contenido del fichero
 upload [ruta] [nombre_fichero]			Sube un fichero a partir de una ruta
 delete [nombre_fichero]				Elimina un fichero
 share [nombre_fichero] [nombre_usuario]		Comparte el fichero con otro usuario
+public [nombre_fichero]				Pone el fichero público para los demás usuarios
 
 `
 	fmt.Print(comandosHelp)
