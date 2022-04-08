@@ -117,10 +117,6 @@ func menuLogin() {
 }
 
 func lsComando(client *http.Client) {
-	//casos:
-	//mostrar los directorios de todos los usuarios si estas en el directorio raiz
-	//si estas en el directorio de otro usuario mostrar sus ficheros y publicos y los compartidos contigo
-	//si estas en tu propio directorio mostrar todo su contenido
 	data := url.Values{}
 	data.Set("cmd", "ls")           // comando (string)
 	data.Set("user", usuarioActual) // usuario (string)
@@ -267,7 +263,26 @@ func deleteComando(nombreFichero string, client *http.Client) {
 	r.Body.Close() // hay que cerrar el reader del body
 }
 
-/*func cdComando(directorio string, client *http.Client) {
+func cdComando(directorio string, client *http.Client) {
+	data := url.Values{}               // estructura para contener los valores
+	data.Set("cmd", "cd")              // comando (string)
+	data.Set("user", usuarioActual)    // usuario (string)
+	data.Set("directorio", directorio) // usuario (string)
+
+	r, err := client.PostForm("https://localhost:10443", data) // enviamos por POST
+	chk(err)
+	resp := srv.Resp{}
+	json.NewDecoder(r.Body).Decode(&resp) // decodificamos la respuesta para utilizar sus campos más adelante
+	//fmt.Println(resp)                     // imprimimos por pantalla
+	if resp.Ok {
+		ruta = resp.Msg
+	} else {
+		fmt.Println(resp.Msg)
+	}
+	r.Body.Close() // hay que cerrar el reader del body
+}
+
+/*func paraTi(client *http.Client) {
 	// ** ejemplo de registro
 	data := url.Values{}            // estructura para contener los valores
 	data.Set("cmd", "cd")           // comando (string)
@@ -288,28 +303,6 @@ func deleteComando(nombreFichero string, client *http.Client) {
 	}
 	r.Body.Close() // hay que cerrar el reader del body
 }*/
-
-func paraTi(client *http.Client) {
-	// ** ejemplo de registro
-	data := url.Values{}            // estructura para contener los valores
-	data.Set("cmd", "cd")           // comando (string)
-	data.Set("user", usuarioActual) // usuario (string)
-
-	r, err := client.PostForm("https://localhost:10443", data) // enviamos por POST
-	chk(err)
-	resp := srv.Resp{}
-	json.NewDecoder(r.Body).Decode(&resp) // decodificamos la respuesta para utilizar sus campos más adelante
-	//fmt.Println(resp)                     // imprimimos por pantalla
-	if resp.Ok {
-		nombres := strings.Split(resp.Msg, " ")
-		for _, nombre := range nombres {
-			fmt.Println("/" + nombre)
-		}
-	} else {
-		fmt.Println(resp.Msg)
-	}
-	r.Body.Close() // hay que cerrar el reader del body
-}
 
 func accionComando(cadena string) {
 	var moreCommands = true
@@ -341,8 +334,8 @@ func accionComando(cadena string) {
 		break
 	case "cd":
 		if moreCommands {
-			//directorio := trozos[1]
-			//cdComando(directorio, client)
+			directorio := trozos[1]
+			cdComando(directorio, client)
 		} else {
 			ruta = "/"
 		}

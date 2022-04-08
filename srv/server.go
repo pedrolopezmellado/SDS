@@ -246,6 +246,10 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		response(w, true, string(datos), u.Token)
 
 	case "ls":
+		//casos:
+		//mostrar los directorios de todos los usuarios si estas en el directorio raiz
+		//si estas en el directorio de otro usuario mostrar sus ficheros y publicos y los compartidos contigo
+		//si estas en tu propio directorio mostrar todo su contenido
 		u, ok := gUsers[req.Form.Get("user")] // ¿existe ya el usuario?
 		if !ok {
 			response(w, false, "No autentificado", nil)
@@ -255,17 +259,36 @@ func handler(w http.ResponseWriter, req *http.Request) {
 			response(w, false, "No autentificado", nil)
 			return
 		} else {
+			ruta := req.Form.Get("ruta")
+			ruta = ruta[:len(ruta)-2]
 			var nombres []string
 			var mensaje string
-			for nombre := range u.Directorio.ficheros {
-				nombres = append(nombres, nombre)
-			}
-			if len(nombres) == 0 {
-				mensaje = "Tu directorio no contiene ficheros actualmente"
+			if ruta == "/" {
+				for nombre := range gUsers {
+					nombres = append(nombres, "/"+nombre)
+				}
+				mensaje = strings.Join(nombres, "\n")
+				response(w, true, mensaje, u.Token)
+				return
 			} else {
-				mensaje = strings.Join(nombres, " ")
+				nombreUsuario := ruta[1:]
+				if u.Name == nombreUsuario {
+					for nombre := range u.Directorio.ficheros {
+						nombres = append(nombres, nombre)
+					}
+					mensaje = strings.Join(nombres, "\n")
+					response(w, true, mensaje, u.Token)
+					return
+				} else {
+					//ACABAR
+					usuario := gUsers[nombreUsuario]
+					for nombre, fichero := range usuario.Directorio.ficheros {
+						if fichero.public || fichero.sharedUsers[u.Name] {
+
+						}
+					}
+				}
 			}
-			response(w, true, mensaje, u.Token)
 		}
 	case "touch":
 		u, ok := gUsers[req.Form.Get("user")] // ¿existe ya el usuario?
@@ -298,12 +321,19 @@ func handler(w http.ResponseWriter, req *http.Request) {
 			response(w, false, "No autentificado", nil)
 			return
 		} else {
-			var nombres []string
-			for Name := range gUsers {
-				nombres = append(nombres, Name)
+			directorio := req.Form.Get("directorio")
+			directorio = directorio[:len(directorio)-2]
+			existe := false
+			for nombre := range gUsers {
+				if nombre == directorio {
+					existe = true
+				}
 			}
-			mensaje := strings.Join(nombres, " ")
-			response(w, true, mensaje, u.Token)
+			if existe {
+				response(w, true, "/"+directorio, u.Token)
+			} else {
+				response(w, false, "El directorio no existe", u.Token)
+			}
 		}
 	case "share":
 		u, ok := gUsers[req.Form.Get("user")] // ¿existe ya el usuario?
