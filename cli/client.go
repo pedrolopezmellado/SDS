@@ -339,6 +339,8 @@ func accionComando(cadena string) {
 			}
 		}
 		break
+	case "private":
+		break
 	default:
 		fmt.Println("Ese comando no existe")
 		break
@@ -361,6 +363,7 @@ upload [ruta] [nombre_fichero]			Sube un fichero a partir de una ruta
 delete [nombre_fichero]				Elimina un fichero
 share [nombre_fichero] [nombre_usuario]		Comparte el fichero con otro usuario
 public [nombre_fichero]				Pone el fichero público para los demás usuarios
+private [nombre_fichero]			Pone el fichero privado
 
 `
 	fmt.Print(comandosHelp)

@@ -308,7 +308,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
 			}
 
 			usuarioShare, okUser := gUsers[nombreUsuario] // ¿existe ya el usuario?
-			fichero, okFichero := gUsers[u.Name].Directorio.ficheros[nombreFichero]
+			_, okFichero := gUsers[u.Name].Directorio.ficheros[nombreFichero]
 			if !okFichero {
 				response(w, false, "No existe ningún fichero con ese nombre", u.Token)
 				return
@@ -317,8 +317,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
 					response(w, false, "El usuario al que desea compartir su fichero no existe", u.Token)
 					return
 				} else {
-					fichero.sharedUsers[usuarioShare.Name] = usuarioShare
-					gUsers[u.Name].Directorio.ficheros[nombreFichero] = fichero
+					gUsers[u.Name].Directorio.ficheros[nombreFichero].sharedUsers[usuarioShare.Name] = usuarioShare
 					fmt.Println(gUsers[u.Name].Directorio.ficheros[nombreFichero].sharedUsers)
 					response(w, true, "Fichero compartido con "+usuarioShare.Name, u.Token)
 					return
