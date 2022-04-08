@@ -186,8 +186,10 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		}
 
 		miFichero := fichero{
-			nombre:    nombreFichero,
-			contenido: contenidoFichero,
+			nombre:      nombreFichero,
+			contenido:   contenidoFichero,
+			public:      false,
+			sharedUsers: make(map[string]user),
 		}
 		gUsers[u.Name].Directorio.ficheros[nombreFichero] = miFichero
 		mensaje := "Fichero subido correctamente"
@@ -275,15 +277,19 @@ func handler(w http.ResponseWriter, req *http.Request) {
 			response(w, false, "No autentificado", nil)
 			return
 		} else {
+			nombreFichero := req.Form.Get("nombreFichero")
+			nombreFichero = nombreFichero[:len(nombreFichero)-2]
 			miFichero := fichero{
-				nombre:    req.Form.Get("nombreFichero"),
-				contenido: "",
+				nombre:      nombreFichero,
+				contenido:   "",
+				public:      false,
+				sharedUsers: make(map[string]user),
 			}
 			gUsers[u.Name].Directorio.ficheros[miFichero.nombre] = miFichero
 			response(w, true, "Fichero creado", u.Token)
 		}
 	case "share":
-		/*u, ok := gUsers[req.Form.Get("user")] // ¿existe ya el usuario?
+		u, ok := gUsers[req.Form.Get("user")] // ¿existe ya el usuario?
 		if !ok {
 			response(w, false, "No autentificado", nil)
 			return
@@ -293,18 +299,53 @@ func handler(w http.ResponseWriter, req *http.Request) {
 			return
 		} else {
 			nombreFichero := req.Form.Get("nombreFichero")
-			usuario := req.Form.Get("userShare")
+			nombreUsuario := req.Form.Get("userShare")
+			nombreUsuario = nombreUsuario[:len(nombreUsuario)-2]
+
+			if nombreUsuario == u.Name {
+				response(w, false, "No puedes compartir un fichero contigo mismo", u.Token)
+				return
+			}
+
+			usuarioShare, okUser := gUsers[nombreUsuario] // ¿existe ya el usuario?
+			fichero, okFichero := gUsers[u.Name].Directorio.ficheros[nombreFichero]
+			if !okFichero {
+				response(w, false, "No existe ningún fichero con ese nombre", u.Token)
+				return
+			} else {
+				if !okUser {
+					response(w, false, "El usuario al que desea compartir su fichero no existe", u.Token)
+					return
+				} else {
+					fichero.sharedUsers[usuarioShare.Name] = usuarioShare
+					gUsers[u.Name].Directorio.ficheros[nombreFichero] = fichero
+					fmt.Println(gUsers[u.Name].Directorio.ficheros[nombreFichero].sharedUsers)
+					response(w, true, "Fichero compartido con "+usuarioShare.Name, u.Token)
+					return
+				}
+			}
+		}
+	case "public":
+		u, ok := gUsers[req.Form.Get("user")] // ¿existe ya el usuario?
+		if !ok {
+			response(w, false, "No autentificado", nil)
+			return
+		} else if (u.Token == nil) || (time.Since(u.Seen).Minutes() > 60) {
+			// sin token o con token expirado
+			response(w, false, "No autentificado", nil)
+			return
+		} else {
+			nombreFichero := req.Form.Get("nombreFichero")
 			fichero, ok := gUsers[u.Name].Directorio.ficheros[nombreFichero]
 			if !ok {
 				response(w, false, "No existe ningún fichero con ese nombre", u.Token)
 				return
+			} else {
+				fichero.public = true
+				gUsers[u.Name].Directorio.ficheros[nombreFichero] = fichero
 			}
-			else{
-				u, ok := gUsers[req.Form.Get("userShare")]
-				if()
-			}
-			response(w, true, "Fichero creado", u.Token)
-		}*/
+			response(w, true, "Ahora "+nombreFichero+" es público", u.Token)
+		}
 	default:
 		response(w, false, "Comando no implementado", nil)
 	}

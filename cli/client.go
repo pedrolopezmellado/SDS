@@ -176,7 +176,8 @@ func touchComando(nombreFichero string, client *http.Client) {
 }
 
 func shareComando(nombreFichero string, usuario string, client *http.Client) {
-	/*data := url.Values{}
+	fmt.Print(usuario)
+	data := url.Values{}
 	data.Set("cmd", "share")        // comando (string)
 	data.Set("user", usuarioActual) // usuario (string)
 	data.Set("nombreFichero", nombreFichero)
@@ -186,10 +187,21 @@ func shareComando(nombreFichero string, usuario string, client *http.Client) {
 	chk(err)
 	resp := srv.Resp{}
 	json.NewDecoder(r.Body).Decode(&resp) // decodificamos la respuesta para utilizar sus campos más adelante
-	fmt.Println(resp)                     // imprimimos por pantalla
-	if resp.Ok {
-		fmt.Println(resp.Msg)
-	}
+	fmt.Println(resp.Msg)
+	r.Body.Close() // hay que cerrar el reader del body
+}
+
+func publicComando(nombreFichero string, client *http.Client) {
+	data := url.Values{}
+	data.Set("cmd", "public")       // comando (string)
+	data.Set("user", usuarioActual) // usuario (string)
+	data.Set("nombreFichero", nombreFichero)
+
+	r, err := client.PostForm("https://localhost:10443", data) // enviamos por POST
+	chk(err)
+	resp := srv.Resp{}
+	json.NewDecoder(r.Body).Decode(&resp) // decodificamos la respuesta para utilizar sus campos más adelante
+	fmt.Println(resp.Msg)
 	r.Body.Close() // hay que cerrar el reader del body*/
 }
 
@@ -306,7 +318,7 @@ func accionComando(cadena string) {
 		if !moreCommands {
 			fmt.Println("Debes introducir el nombre del fichero y del usuario a compartir")
 		} else {
-			if len(trozos) > 3 {
+			if len(trozos) == 2 || len(trozos) > 3 {
 				fmt.Println("Debes introducir el nombre del fichero y del usuario a compartir únicamente")
 			} else if len(trozos) == 3 {
 				nombreFichero := trozos[1]
@@ -316,6 +328,16 @@ func accionComando(cadena string) {
 		}
 		break
 	case "public":
+		if !moreCommands {
+			fmt.Println("Debes introducir el nombre del fichero como argumento")
+		} else {
+			if len(trozos) > 2 {
+				fmt.Println("Debes introducir el nombre del fichero únicamente")
+			} else {
+				nombreFichero := trozos[1]
+				publicComando(nombreFichero, client)
+			}
+		}
 		break
 	default:
 		fmt.Println("Ese comando no existe")
