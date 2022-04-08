@@ -99,24 +99,6 @@ func login(client *http.Client) {
 	r.Body.Close() // hay que cerrar el reader del body
 }
 
-func lsComando(client *http.Client) {
-	fmt.Println("entra en ls")
-	data := url.Values{}
-	data.Set("cmd", "ls")           // comando (string)
-	data.Set("user", usuarioActual) // usuario (string)
-
-	r, err := client.PostForm("https://localhost:10443", data) // enviamos por POST
-	chk(err)
-	resp := srv.Resp{}
-	json.NewDecoder(r.Body).Decode(&resp) // decodificamos la respuesta para utilizar sus campos más adelante
-	fmt.Println(resp)                     // imprimimos por pantalla
-	if resp.Ok {
-		fmt.Println("Directorios:")
-		fmt.Println(resp.Msg)
-	}
-	r.Body.Close() // hay que cerrar el reader del body
-}
-
 func menuLogin() {
 
 	cadena := ""
@@ -131,19 +113,34 @@ func menuLogin() {
 	}
 }
 
+func lsComando(client *http.Client) {
+	data := url.Values{}
+	data.Set("cmd", "ls")           // comando (string)
+	data.Set("user", usuarioActual) // usuario (string)
+
+	r, err := client.PostForm("https://localhost:10443", data) // enviamos por POST
+	chk(err)
+	resp := srv.Resp{}
+	json.NewDecoder(r.Body).Decode(&resp) // decodificamos la respuesta para utilizar sus campos más adelante
+	//fmt.Println(resp)                     // imprimimos por pantalla
+	if resp.Ok {
+		fmt.Println(resp.Msg)
+	}
+	r.Body.Close() // hay que cerrar el reader del body
+}
+
 func uploadComando(ruta string, nombreFichero string, client *http.Client) {
 	// ** ejemplo de registro
-	data := url.Values{}      // estructura para contener los valores
-	data.Set("cmd", "upload") // comando (string)
-	fmt.Println(usuarioActual)
+	data := url.Values{}            // estructura para contener los valores
+	data.Set("cmd", "upload")       // comando (string)
 	data.Set("user", usuarioActual) // usuario (string)
-	dir, err := os.Getwd()
-	fmt.Println(dir)
+	//dir, err := os.Getwd()
+	//fmt.Println(dir)
 	file, err := ioutil.ReadFile("./ficheros/" + ruta)
 	if err != nil {
 		fmt.Println(err)
 	} else {
-		fmt.Println(string(file))
+		//fmt.Println(string(file))
 
 		data.Set("contenidoFichero", string(file)) // usuario (string)
 		data.Set("nombreFichero", nombreFichero)
@@ -152,16 +149,50 @@ func uploadComando(ruta string, nombreFichero string, client *http.Client) {
 		chk(err)
 		resp := srv.Resp{}
 		json.NewDecoder(r.Body).Decode(&resp) // decodificamos la respuesta para utilizar sus campos más adelante
-		fmt.Println(resp)                     // imprimimos por pantalla
+		//fmt.Println(resp)                     // imprimimos por pantalla
 		if resp.Ok {
-
+			fmt.Println(resp.Msg)
 		}
 		r.Body.Close() // hay que cerrar el reader del body
 
 		// imprimir el string
 		//fmt.Println(datosComoString)
 	}
+}
 
+func touchComando(nombreFichero string, client *http.Client) {
+	data := url.Values{}
+	data.Set("cmd", "touch")        // comando (string)
+	data.Set("user", usuarioActual) // usuario (string)
+	data.Set("nombreFichero", nombreFichero)
+
+	r, err := client.PostForm("https://localhost:10443", data) // enviamos por POST
+	chk(err)
+	resp := srv.Resp{}
+	json.NewDecoder(r.Body).Decode(&resp) // decodificamos la respuesta para utilizar sus campos más adelante
+	fmt.Println(resp)                     // imprimimos por pantalla
+	if resp.Ok {
+		fmt.Println(resp.Msg)
+	}
+	r.Body.Close() // hay que cerrar el reader del body
+}
+
+func shareComando(nombreFichero string, usuario string, client *http.Client) {
+	/*data := url.Values{}
+	data.Set("cmd", "share")        // comando (string)
+	data.Set("user", usuarioActual) // usuario (string)
+	data.Set("nombreFichero", nombreFichero)
+	data.Set("userShare", usuario)
+
+	r, err := client.PostForm("https://localhost:10443", data) // enviamos por POST
+	chk(err)
+	resp := srv.Resp{}
+	json.NewDecoder(r.Body).Decode(&resp) // decodificamos la respuesta para utilizar sus campos más adelante
+	fmt.Println(resp)                     // imprimimos por pantalla
+	if resp.Ok {
+		fmt.Println(resp.Msg)
+	}
+	r.Body.Close() // hay que cerrar el reader del body*/
 }
 
 func accionComando(cadena string) {
@@ -194,7 +225,16 @@ func accionComando(cadena string) {
 		}
 		break
 	case "touch":
-		//accion_touch()
+		if !moreCommands {
+			fmt.Println("Debes introducir el nombre del fichero como argumento")
+		} else {
+			if len(trozos) > 2 {
+				fmt.Println("Debes introducir el nombre del fichero únicamente")
+			} else {
+				nombreFichero := trozos[1]
+				touchComando(nombreFichero, client)
+			}
+		}
 		break
 	case "cat":
 		//accion_cat()
@@ -207,7 +247,17 @@ func accionComando(cadena string) {
 	case "delete":
 		//accion_delete()
 	case "share":
-		//accion_share()
+		if !moreCommands {
+			fmt.Println("Debes introducir el nombre del fichero y del usuario a compartir")
+		} else {
+			if len(trozos) > 3 {
+				fmt.Println("Debes introducir el nombre del fichero y del usuario a compartir únicamente")
+			} else if len(trozos) == 3 {
+				nombreFichero := trozos[1]
+				usuario := trozos[2]
+				shareComando(nombreFichero, usuario, client)
+			}
+		}
 		break
 	default:
 		fmt.Println("Ese comando no existe")
