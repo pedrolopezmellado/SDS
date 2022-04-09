@@ -260,7 +260,6 @@ func handler(w http.ResponseWriter, req *http.Request) {
 			return
 		} else {
 			ruta := req.Form.Get("ruta")
-			ruta = ruta[:len(ruta)-2]
 			var nombres []string
 			var mensaje string
 			if ruta == "/" {
@@ -280,13 +279,16 @@ func handler(w http.ResponseWriter, req *http.Request) {
 					response(w, true, mensaje, u.Token)
 					return
 				} else {
-					//ACABAR
 					usuario := gUsers[nombreUsuario]
 					for nombre, fichero := range usuario.Directorio.ficheros {
-						if fichero.public || fichero.sharedUsers[u.Name] {
-
+						_, sharedUser := fichero.sharedUsers[u.Name]
+						if fichero.public || sharedUser {
+							nombres = append(nombres, nombre)
 						}
 					}
+					mensaje = strings.Join(nombres, "\n")
+					response(w, true, mensaje, u.Token)
+					return
 				}
 			}
 		}
@@ -323,6 +325,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		} else {
 			directorio := req.Form.Get("directorio")
 			directorio = directorio[:len(directorio)-2]
+			fmt.Print(directorio)
 			existe := false
 			for nombre := range gUsers {
 				if nombre == directorio {

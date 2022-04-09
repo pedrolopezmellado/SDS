@@ -180,7 +180,6 @@ func touchComando(nombreFichero string, client *http.Client) {
 }
 
 func shareComando(nombreFichero string, usuario string, client *http.Client) {
-	fmt.Print(usuario)
 	data := url.Values{}
 	data.Set("cmd", "share")        // comando (string)
 	data.Set("user", usuarioActual) // usuario (string)
