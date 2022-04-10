@@ -135,19 +135,20 @@ func lsComando(client *http.Client) {
 	r.Body.Close() // hay que cerrar el reader del body
 }
 
-func uploadComando(ruta string, nombreFichero string, client *http.Client) {
+func uploadComando(nombreFichero string, client *http.Client) {
 	// ** ejemplo de registro
 	data := url.Values{}            // estructura para contener los valores
 	data.Set("cmd", "upload")       // comando (string)
 	data.Set("user", usuarioActual) // usuario (string)
 	//dir, err := os.Getwd()
 	//fmt.Println(dir)
-	file, err := ioutil.ReadFile("./ficheros/" + ruta)
+	nombreFichero = nombreFichero[:len(nombreFichero)-2]
+	file, err := ioutil.ReadFile("./ficheros/" + nombreFichero)
 	if err != nil {
 		fmt.Println(err)
 	} else {
 		//fmt.Println(string(file))
-
+		data.Set("ruta", ruta)
 		data.Set("contenidoFichero", string(file)) // usuario (string)
 		data.Set("nombreFichero", nombreFichero)
 
@@ -168,6 +169,7 @@ func touchComando(nombreFichero string, client *http.Client) {
 	data := url.Values{}
 	data.Set("cmd", "touch")        // comando (string)
 	data.Set("user", usuarioActual) // usuario (string)
+	data.Set("ruta", ruta)
 	data.Set("nombreFichero", nombreFichero)
 
 	r, err := client.PostForm("https://localhost:10443", data) // enviamos por POST
@@ -175,9 +177,8 @@ func touchComando(nombreFichero string, client *http.Client) {
 	resp := srv.Resp{}
 	json.NewDecoder(r.Body).Decode(&resp) // decodificamos la respuesta para utilizar sus campos más adelante
 	fmt.Println(resp)                     // imprimimos por pantalla
-	if resp.Ok {
-		fmt.Println(resp.Msg)
-	}
+	fmt.Println(resp.Msg)
+
 	r.Body.Close() // hay que cerrar el reader del body
 }
 
@@ -340,12 +341,11 @@ func accionComando(cadena string) {
 		}
 		break
 	case "upload":
-		if len(trozos) != 3 {
+		if len(trozos) != 2 {
 			fmt.Println("Error al introducir argumentos")
 		} else {
-			ruta := trozos[1]
-			nombreFichero := trozos[2]
-			uploadComando(ruta, nombreFichero, client)
+			nombreFichero := trozos[1]
+			uploadComando(nombreFichero, client)
 		}
 		break
 	case "delete":
@@ -414,7 +414,7 @@ cd 						Te lleva al directorio raíz
 cd [nombre_usuario]				Te lleva al directorio del usuario				
 touch [nombre_fichero] 				Crea un fichero en la ruta
 cat [nombre_fichero] 				Muestra el contenido del fichero
-upload [ruta] [nombre_fichero]			Sube un fichero a partir de una ruta
+upload [nombre_fichero]				Sube un fichero de la carpeta ficheros
 delete [nombre_fichero]				Elimina un fichero
 share [nombre_fichero] [nombre_usuario]		Comparte el fichero con otro usuario
 public [nombre_fichero]				Pone el fichero público para los demás usuarios

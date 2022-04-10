@@ -176,9 +176,15 @@ func handler(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 
+		ruta := req.Form.Get("ruta")
+		usuario := ruta[1:]
+		if u.Name != usuario {
+			response(w, false, "No tienes permisos para subir ficheros en este directorio", u.Token)
+			return
+		}
+
 		contenidoFichero := req.Form.Get("contenidoFichero")
 		nombreFichero := req.Form.Get("nombreFichero")
-		nombreFichero = nombreFichero[:len(nombreFichero)-2]
 
 		ficheroActual, okFichero := gUsers[u.Name].Directorio.ficheros[nombreFichero]
 		if okFichero {
@@ -315,6 +321,13 @@ func handler(w http.ResponseWriter, req *http.Request) {
 			// sin token o con token expirado
 			response(w, false, "No autentificado", nil)
 			return
+		}
+
+		ruta := req.Form.Get("ruta")
+		usuario := ruta[1:]
+		fmt.Print(usuario)
+		if u.Name != usuario {
+			response(w, false, "No tienes permisos para crear un fichero en este directorio", u.Token)
 		} else {
 			nombreFichero := req.Form.Get("nombreFichero")
 			nombreFichero = nombreFichero[:len(nombreFichero)-2]
