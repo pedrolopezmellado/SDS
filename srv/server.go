@@ -178,6 +178,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
 
 		contenidoFichero := req.Form.Get("contenidoFichero")
 		nombreFichero := req.Form.Get("nombreFichero")
+		nombreFichero = nombreFichero[:len(nombreFichero)-2]
 
 		ficheroActual, okFichero := gUsers[u.Name].Directorio.ficheros[nombreFichero]
 		if okFichero {
@@ -202,9 +203,23 @@ func handler(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 		nombreFichero := req.Form.Get("nombreFichero")
-		fichero, okFichero := gUsers[u.Name].Directorio.ficheros[nombreFichero]
+		ruta := req.Form.Get("ruta")
+		usuario := ruta[1:]
+		fmt.Println("el len es: " + strconv.Itoa(len(usuario)))
+		fmt.Println("el usuario es: " + usuario)
+		fmt.Println(gUsers[usuario].Directorio.ficheros)
+		fichero, okFichero := gUsers[usuario].Directorio.ficheros[nombreFichero]
 		if !okFichero {
 			response(w, false, "El fichero no existe", u.Token)
+			return
+		}
+		if u.Name != usuario { // si el usuario que hace la peticion no es el autor del fichero
+			_, existe := fichero.sharedUsers[usuario]
+			if fichero.public || existe { // comprobamos que el usuario tiene permisos
+				response(w, true, fichero.contenido, u.Token)
+			} else {
+				response(w, false, "El usuario no tiene permisos", u.Token)
+			}
 			return
 		}
 		response(w, true, fichero.contenido, u.Token)
@@ -326,14 +341,16 @@ func handler(w http.ResponseWriter, req *http.Request) {
 			directorio := req.Form.Get("directorio")
 			directorio = directorio[:len(directorio)-2]
 			fmt.Print(directorio)
+			var nombreDir string
 			existe := false
 			for nombre := range gUsers {
-				if nombre == directorio {
+				if nombre == directorio || "/"+nombre == directorio {
 					existe = true
+					nombreDir = nombre
 				}
 			}
 			if existe {
-				response(w, true, "/"+directorio, u.Token)
+				response(w, true, "/"+nombreDir, u.Token)
 			} else {
 				response(w, false, "El directorio no existe", u.Token)
 			}

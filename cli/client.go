@@ -23,6 +23,7 @@ import (
 
 var usuarioActual string
 var ruta string
+var exit bool
 
 // chk comprueba y sale si hay errores (ahorra escritura en programas sencillos)
 func chk(e error) {
@@ -36,10 +37,10 @@ func registro(pubJSON []byte, pkJSON []byte, client *http.Client) {
 	usuario := ""
 	password := ""
 
-	fmt.Println("*** Registro ***")
-	fmt.Println("Usuario: ")
+	fmt.Println("\n*** Registro ***")
+	fmt.Print("Usuario: ")
 	fmt.Scanln(&usuario)
-	fmt.Println("Contraseña: ")
+	fmt.Print("Contraseña: ")
 	fmt.Scanln(&password)
 
 	// ** ejemplo de registro
@@ -104,8 +105,9 @@ func login(client *http.Client) {
 func menuLogin() {
 
 	cadena := ""
+	exit = false
 
-	for strings.Split(cadena, " ")[0] != "exit\n" {
+	for !exit {
 		fmt.Println("\n*** Home ***")
 		fmt.Print("Introduce 'help' para obtener información de los comandos\n\n")
 		fmt.Println("ruta: " + ruta)
@@ -224,11 +226,11 @@ func privateComando(nombreFichero string, client *http.Client) {
 
 func catComando(nombreFichero string, client *http.Client) {
 	// ** ejemplo de registro
-	data := url.Values{}                     // estructura para contener los valores
-	data.Set("cmd", "cat")                   // comando (string)
-	data.Set("user", usuarioActual)          // usuario (string)
-	data.Set("nombreFichero", nombreFichero) // nombre del fichero (string)
-
+	data := url.Values{}                                       // estructura para contener los valores
+	data.Set("cmd", "cat")                                     // comando (string)
+	data.Set("user", usuarioActual)                            // usuario (string)
+	data.Set("nombreFichero", nombreFichero)                   // nombre del fichero (string)
+	data.Set("ruta", ruta)                                     // ruta (string)
 	r, err := client.PostForm("https://localhost:10443", data) // enviamos por POST
 	chk(err)
 	resp := srv.Resp{}
@@ -413,8 +415,11 @@ func accionComando(cadena string) {
 			}
 		}
 		break
+	case "exit":
+		exit = true
+		break
 	default:
-		fmt.Println("Ese comando no existe")
+		fmt.Println("Error al introducir el comando")
 		break
 	}
 }
@@ -436,6 +441,7 @@ delete [nombre_fichero]				Elimina un fichero
 share [nombre_fichero] [nombre_usuario]		Comparte el fichero con otro usuario
 public [nombre_fichero]				Pone el fichero público para los demás usuarios
 private [nombre_fichero]			Pone el fichero privado
+exit						Salir al menú inicial
 
 `
 	fmt.Print(comandosHelp)
