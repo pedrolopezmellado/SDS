@@ -28,15 +28,21 @@ type PasswordConfig struct {
 }
 
 type fichero struct {
-	nombre      string
-	contenido   string
-	public      bool
-	sharedUsers map[string]user
+	Nombre      string
+	Contenido   string
+	Public      bool
+	SharedUsers map[string]user
+	Notas       []nota
 }
 
 type directorio struct {
-	nombre   string
-	ficheros map[string]fichero
+	Nombre   string
+	Ficheros map[string]fichero
+}
+
+type nota struct {
+	Usuario   string
+	Contenido string
 }
 
 // ejemplo de tipo para un usuario
@@ -131,8 +137,8 @@ func handler(w http.ResponseWriter, req *http.Request) {
 
 		u := user{}
 		u.Name = req.Form.Get("user") // nombre
-		u.Directorio.nombre = u.Name
-		u.Directorio.ficheros = make(map[string]fichero)
+		u.Directorio.Nombre = u.Name
+		u.Directorio.Ficheros = make(map[string]fichero)
 		u.Salt = make([]byte, 16)                       // sal (16 bytes == 128 bits)
 		rand.Read(u.Salt)                               // la sal es aleatoria
 		u.Data = make(map[string]string)                // reservamos mapa de datos de usuario
@@ -186,19 +192,19 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		contenidoFichero := req.Form.Get("contenidoFichero")
 		nombreFichero := req.Form.Get("nombreFichero")
 
-		ficheroActual, okFichero := gUsers[u.Name].Directorio.ficheros[nombreFichero]
+		ficheroActual, okFichero := gUsers[u.Name].Directorio.Ficheros[nombreFichero]
 		if okFichero {
-			response(w, false, "El fichero "+ficheroActual.nombre+" ya existe", u.Token)
+			response(w, false, "El fichero "+ficheroActual.Nombre+" ya existe", u.Token)
 			return
 		}
 
 		miFichero := fichero{
-			nombre:      nombreFichero,
-			contenido:   contenidoFichero,
-			public:      false,
-			sharedUsers: make(map[string]user),
+			Nombre:      nombreFichero,
+			Contenido:   contenidoFichero,
+			Public:      false,
+			SharedUsers: make(map[string]user),
 		}
-		gUsers[u.Name].Directorio.ficheros[nombreFichero] = miFichero
+		gUsers[u.Name].Directorio.Ficheros[nombreFichero] = miFichero
 		mensaje := "Fichero subido correctamente"
 		response(w, true, mensaje, u.Token)
 
@@ -212,22 +218,24 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		nombreFichero = nombreFichero[:len(nombreFichero)-2]
 		ruta := req.Form.Get("ruta")
 		usuario := ruta[1:]
-		fichero, okFichero := gUsers[usuario].Directorio.ficheros[nombreFichero]
+		fichero, okFichero := gUsers[usuario].Directorio.Ficheros[nombreFichero]
 		if !okFichero {
 			response(w, false, "El fichero no existe", u.Token)
 			return
 		} else if u.Name != usuario { // si el usuario que hace la peticion no es el autor del fichero
-			_, existe := fichero.sharedUsers[u.Name]
-			fmt.Print(existe)
-			fmt.Print(fichero.sharedUsers)
-			if fichero.public || existe { // comprobamos que el usuario tiene permisos
-				response(w, true, fichero.contenido, u.Token)
+			_, existe := fichero.SharedUsers[u.Name]
+			if fichero.Public || existe { // comprobamos que el usuario tiene permisos
+				datos, err := json.Marshal(&fichero) //
+				chk(err)
+				response(w, true, string(datos), u.Token)
 			} else {
 				response(w, false, "El usuario no tiene permisos", u.Token)
 			}
 			return
 		}
-		response(w, true, fichero.contenido, u.Token)
+		datos, err := json.Marshal(&fichero) //
+		chk(err)
+		response(w, true, string(datos), u.Token)
 
 	case "delete":
 		u, ok := gUsers[req.Form.Get("user")] // ¿existe ya el usuario?
@@ -236,12 +244,12 @@ func handler(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 		nombreFichero := req.Form.Get("nombreFichero")
-		fichero, okFichero := gUsers[u.Name].Directorio.ficheros[nombreFichero]
+		fichero, okFichero := gUsers[u.Name].Directorio.Ficheros[nombreFichero]
 		if !okFichero {
 			response(w, false, "El fichero no existe", u.Token)
 			return
 		}
-		delete(gUsers[u.Name].Directorio.ficheros, fichero.nombre)
+		delete(gUsers[u.Name].Directorio.Ficheros, fichero.Nombre)
 		response(w, true, "Fichero eliminado correctamente", u.Token)
 
 	case "data": // ** obtener datos de usuario
@@ -292,7 +300,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
 			} else {
 				nombreUsuario := ruta[1:]
 				if u.Name == nombreUsuario {
-					for nombre := range u.Directorio.ficheros {
+					for nombre := range u.Directorio.Ficheros {
 						nombres = append(nombres, nombre)
 					}
 					mensaje = strings.Join(nombres, "\n")
@@ -300,9 +308,9 @@ func handler(w http.ResponseWriter, req *http.Request) {
 					return
 				} else {
 					usuario := gUsers[nombreUsuario]
-					for nombre, fichero := range usuario.Directorio.ficheros {
-						_, sharedUser := fichero.sharedUsers[u.Name]
-						if fichero.public || sharedUser {
+					for nombre, fichero := range usuario.Directorio.Ficheros {
+						_, sharedUser := fichero.SharedUsers[u.Name]
+						if fichero.Public || sharedUser {
 							nombres = append(nombres, nombre)
 						}
 					}
@@ -322,7 +330,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
 			response(w, false, "No autentificado", nil)
 			return
 		}
-
+		contenido := req.Form.Get("contenido")
 		ruta := req.Form.Get("ruta")
 		usuario := ruta[1:]
 		fmt.Print(usuario)
@@ -332,12 +340,12 @@ func handler(w http.ResponseWriter, req *http.Request) {
 			nombreFichero := req.Form.Get("nombreFichero")
 			nombreFichero = nombreFichero[:len(nombreFichero)-2]
 			miFichero := fichero{
-				nombre:      nombreFichero,
-				contenido:   "",
-				public:      false,
-				sharedUsers: make(map[string]user),
+				Nombre:      nombreFichero,
+				Contenido:   contenido,
+				Public:      false,
+				SharedUsers: make(map[string]user),
 			}
-			gUsers[u.Name].Directorio.ficheros[miFichero.nombre] = miFichero
+			gUsers[u.Name].Directorio.Ficheros[miFichero.Nombre] = miFichero
 			response(w, true, "Fichero creado", u.Token)
 		}
 	case "cd":
@@ -387,7 +395,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
 			}
 
 			usuarioShare, okUser := gUsers[nombreUsuario] // ¿existe ya el usuario?
-			_, okFichero := gUsers[u.Name].Directorio.ficheros[nombreFichero]
+			_, okFichero := gUsers[u.Name].Directorio.Ficheros[nombreFichero]
 			if !okFichero {
 				response(w, false, "No existe ningún fichero con ese nombre", u.Token)
 				return
@@ -396,8 +404,8 @@ func handler(w http.ResponseWriter, req *http.Request) {
 					response(w, false, "El usuario al que desea compartir su fichero no existe", u.Token)
 					return
 				} else {
-					gUsers[u.Name].Directorio.ficheros[nombreFichero].sharedUsers[usuarioShare.Name] = usuarioShare
-					fmt.Println(gUsers[u.Name].Directorio.ficheros[nombreFichero].sharedUsers)
+					gUsers[u.Name].Directorio.Ficheros[nombreFichero].SharedUsers[usuarioShare.Name] = usuarioShare
+					fmt.Println(gUsers[u.Name].Directorio.Ficheros[nombreFichero].SharedUsers)
 					response(w, true, "Fichero compartido con "+usuarioShare.Name, u.Token)
 					return
 				}
@@ -416,13 +424,13 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		} else {
 			nombreFichero := req.Form.Get("nombreFichero")
 			nombreFichero = nombreFichero[:len(nombreFichero)-2]
-			fichero, ok := gUsers[u.Name].Directorio.ficheros[nombreFichero]
+			fichero, ok := gUsers[u.Name].Directorio.Ficheros[nombreFichero]
 			if !ok {
 				response(w, false, "No existe ningún fichero con ese nombre", u.Token)
 				return
 			} else {
-				fichero.public = true
-				gUsers[u.Name].Directorio.ficheros[nombreFichero] = fichero
+				fichero.Public = true
+				gUsers[u.Name].Directorio.Ficheros[nombreFichero] = fichero
 			}
 			response(w, true, "Ahora "+nombreFichero+" es público", u.Token)
 		}
@@ -438,16 +446,59 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		} else {
 			nombreFichero := req.Form.Get("nombreFichero")
 			nombreFichero = nombreFichero[:len(nombreFichero)-2]
-			fichero, ok := gUsers[u.Name].Directorio.ficheros[nombreFichero]
+			fichero, ok := gUsers[u.Name].Directorio.Ficheros[nombreFichero]
 			if !ok {
 				response(w, false, "No existe ningún fichero con ese nombre", u.Token)
 				return
 			} else {
-				fichero.public = false
-				gUsers[u.Name].Directorio.ficheros[nombreFichero] = fichero
-				fmt.Println(gUsers[u.Name].Directorio.ficheros)
+				fichero.Public = false
+				gUsers[u.Name].Directorio.Ficheros[nombreFichero] = fichero
+				fmt.Println(gUsers[u.Name].Directorio.Ficheros)
 			}
 			response(w, true, "Ahora "+nombreFichero+" es privado", u.Token)
+		}
+	case "note":
+		u, ok := gUsers[req.Form.Get("user")] // ¿existe ya el usuario?
+		if !ok {
+			response(w, false, "No autentificado", nil)
+			return
+		} else if (u.Token == nil) || (time.Since(u.Seen).Minutes() > 60) {
+			// sin token o con token expirado
+			response(w, false, "No autentificado", nil)
+			return
+		} else {
+			nombreFichero := req.Form.Get("nombreFichero")
+			nombreFichero = nombreFichero[:len(nombreFichero)-2]
+			ruta := req.Form.Get("ruta")
+			contenidoNota := req.Form.Get("contenido")
+			contenidoNota = contenidoNota[:len(contenidoNota)-2]
+			fmt.Println("contenido de la nota: " + contenidoNota)
+			usuario := ruta[1:]
+			fichero, ok := gUsers[u.Name].Directorio.Ficheros[nombreFichero]
+			if !ok {
+				response(w, false, "El fichero no existe", u.Token)
+			}
+			nuevaNota := nota{
+				Usuario:   u.Name,
+				Contenido: contenidoNota,
+			}
+			if u.Name != usuario { // si el usuario que hace la peticion no es el autor del fichero
+				_, existe := fichero.SharedUsers[u.Name]
+				fmt.Print(existe)
+				fmt.Print(fichero.SharedUsers)
+				if fichero.Public || existe { // comprobamos que el usuario tiene permisos
+					fichero.Notas = append(fichero.Notas, nuevaNota)
+
+					response(w, true, "Nota añadida correctamente", u.Token)
+				} else {
+					response(w, false, "El usuario no tiene permisos", u.Token)
+				}
+				return
+			}
+			fichero.Notas = append(fichero.Notas, nuevaNota)
+			gUsers[u.Name].Directorio.Ficheros[nombreFichero] = fichero
+			response(w, true, "Nota añadida correctamente", u.Token)
+			return
 		}
 	default:
 		response(w, false, "Comando no implementado", nil)
@@ -464,10 +515,24 @@ type Resp struct {
 	Token []byte // token de sesión para utilizar por el cliente
 }
 
+type RespFichero struct {
+	Ok      bool   // true -> correcto, false -> error
+	Msg     string // mensaje adicional
+	Fichero fichero
+	Token   []byte // token de sesión para utilizar por el cliente
+}
+
 // función para escribir una respuesta del servidor
 func response(w io.Writer, ok bool, msg string, token []byte) {
 	r := Resp{Ok: ok, Msg: msg, Token: token} // formateamos respuesta
 	rJSON, err := json.Marshal(&r)            // codificamos en JSON
 	chk(err)                                  // comprobamos error
 	w.Write(rJSON)                            // escribimos el JSON resultante
+}
+
+func responseFichero(w io.Writer, ok bool, msg string, fichero fichero, token []byte) {
+	r := RespFichero{Ok: ok, Msg: msg, Fichero: fichero, Token: token} // formateamos respuesta
+	rJSON, err := json.Marshal(&r)                                     // codificamos en JSON
+	chk(err)                                                           // comprobamos error
+	w.Write(rJSON)                                                     // escribimos el JSON resultante
 }

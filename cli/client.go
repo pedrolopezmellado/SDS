@@ -19,11 +19,40 @@ import (
 	"sdspractica/srv"
 	"sdspractica/util"
 	"strings"
+	"time"
 )
 
 var usuarioActual string
 var ruta string
 var exit bool
+
+type nota struct {
+	Usuario   string
+	Contenido string
+}
+
+type fichero struct {
+	Nombre      string
+	Contenido   string
+	Public      bool
+	SharedUsers map[string]user
+	Notas       []nota
+}
+
+type user struct {
+	Name       string            // nombre de usuario
+	Hash       []byte            // hash de la contraseña
+	Salt       []byte            // sal para la contraseña
+	Token      []byte            // token de sesión
+	Seen       time.Time         // última vez que fue visto
+	Data       map[string]string // datos adicionales del usuario
+	Directorio directorio        // directorio del usuario
+}
+
+type directorio struct {
+	Nombre   string
+	Ficheros map[string]fichero
+}
 
 // chk comprueba y sale si hay errores (ahorra escritura en programas sencillos)
 func chk(e error) {
@@ -171,6 +200,11 @@ func touchComando(nombreFichero string, client *http.Client) {
 	data.Set("user", usuarioActual) // usuario (string)
 	data.Set("ruta", ruta)
 	data.Set("nombreFichero", nombreFichero)
+	fmt.Print("Contenido: ")
+	inputReader := bufio.NewReader(os.Stdin)
+	cadena, _ := inputReader.ReadString('\n')
+	cadena = cadena[:len(cadena)-2]
+	data.Set("contenido", cadena)
 
 	r, err := client.PostForm("https://localhost:10443", data) // enviamos por POST
 	chk(err)
@@ -237,8 +271,23 @@ func catComando(nombreFichero string, client *http.Client) {
 	resp := srv.Resp{}
 	json.NewDecoder(r.Body).Decode(&resp) // decodificamos la respuesta para utilizar sus campos más adelante
 	//fmt.Println(resp)                     // imprimimos por pantalla
+	var fichero fichero
+	json.Unmarshal([]byte(resp.Msg), &fichero)
 	if resp.Ok {
-		fmt.Println(resp.Msg)
+		//Mostramos el contenido del fichero
+		fmt.Println("\nNombre: " + fichero.Nombre)
+		fmt.Println(fichero.Contenido + "\n")
+
+		if len(fichero.Notas) > 0 {
+			fmt.Println("------------------------------------------------------------")
+			fmt.Print("Notas\n\n")
+			for i := 0; i < len(fichero.Notas); i++ {
+				fmt.Println("Autor: " + fichero.Notas[i].Usuario)
+				fmt.Println(fichero.Notas[i].Contenido + "\n")
+				fmt.Println("------------------------------------------------------------")
+			}
+		}
+
 	} else {
 		fmt.Println(resp.Msg)
 	}
@@ -281,6 +330,24 @@ func cdComando(directorio string, client *http.Client) {
 	} else {
 		fmt.Println(resp.Msg)
 	}
+	r.Body.Close() // hay que cerrar el reader del body
+}
+
+func noteComando(nombreFichero string, client *http.Client) {
+	data := url.Values{}                     // estructura para contener los valores
+	data.Set("cmd", "note")                  // comando (string)
+	data.Set("user", usuarioActual)          // usuario (string)
+	data.Set("nombreFichero", nombreFichero) // usuario (string)
+	data.Set("ruta", ruta)
+	fmt.Print("Contenido: ")
+	inputReader := bufio.NewReader(os.Stdin)
+	cadena, _ := inputReader.ReadString('\n')
+	data.Set("contenido", cadena)
+	r, err := client.PostForm("https://localhost:10443", data) // enviamos por POST
+	chk(err)
+	resp := srv.Resp{}
+	json.NewDecoder(r.Body).Decode(&resp) // decodificamos la respuesta para utilizar sus campos más adelante
+	fmt.Println(resp.Msg)
 	r.Body.Close() // hay que cerrar el reader del body
 }
 
@@ -393,6 +460,18 @@ func accionComando(cadena string) {
 			}
 		}
 		break
+	case "note":
+		if !moreCommands {
+			fmt.Println("Debes introducir el nombre del fichero como argumento")
+		} else {
+			if len(trozos) > 3 {
+				fmt.Println("Debes introducir el nombre del fichero únicamente")
+			} else {
+				nombreFichero := trozos[1]
+				noteComando(nombreFichero, client)
+			}
+		}
+
 	case "exit":
 		exit = true
 		break
@@ -419,6 +498,7 @@ delete [nombre_fichero]				Elimina un fichero
 share [nombre_fichero] [nombre_usuario]		Comparte el fichero con otro usuario
 public [nombre_fichero]				Pone el fichero público para los demás usuarios
 private [nombre_fichero]			Pone el fichero privado
+note [nombre_fichero] 				Escribe una nota en el fichero
 exit						Salir al menú inicial
 
 `
