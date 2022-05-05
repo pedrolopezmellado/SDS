@@ -39,22 +39,6 @@ import (
 	"sdspractica/srv"
 )
 
-/*
-
-func conexionBD() (conexion *sql.DB) {
-	Driver := "mysql"
-	Usuario := "root"
-	Password := ""
-	Nombre := "sds"
-
-	conexion, err := sql.Open(Driver, Usuario+":"+Password+"@tcp(127.0.0.1)/"+Nombre)
-	if err != nil {
-		panic(err.Error())
-	}
-	return conexion
-}
-*/
-
 func main() {
 
 	fmt.Println("PRACTICA SDS 2021/2022")

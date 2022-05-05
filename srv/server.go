@@ -162,12 +162,10 @@ func handler(w http.ResponseWriter, req *http.Request) {
 			response(w, false, "Usuario inexistente", nil)
 			return
 		}
-
 		password := util.Decode64(req.Form.Get("pass")) // obtenemos la contraseña (keyLogin)
 		//hash, _ := scrypt.Key(password, u.Salt, 16384, 8, 1, 32) // scrypt de keyLogin (argon2 es mejor)
 		if !comparePassword(password, u.Hash) { // comparamos
 			response(w, false, "Credenciales inválidas", nil)
-
 		} else {
 			u.Seen = time.Now()        // asignamos tiempo de login
 			u.Token = make([]byte, 16) // token (16 bytes == 128 bits)
