@@ -13,10 +13,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
+	"log"
 	"net/http"
+	"os"
+	"os/signal"
 	"sdspractica/util"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"golang.org/x/crypto/argon2"
@@ -56,6 +61,30 @@ type user struct {
 	Seen       time.Time         // última vez que fue visto
 	Data       map[string]string // datos adicionales del usuario
 	Directorio directorio        // directorio del usuario
+}
+
+// mapa con todos los usuarios
+// (se podría serializar con JSON o Gob, etc. y escribir/leer de disco para persistencia)
+var gUsers map[string]user
+
+func leerEnDisco() {
+	data, err := ioutil.ReadFile("disco.txt")
+	if err != nil {
+		log.Panicf("failed reading data from file: %s", err)
+	}
+
+	err = json.Unmarshal([]byte(data), &gUsers)
+	fmt.Println(gUsers)
+}
+
+func guardarEnDisco() {
+	datosJson, err := json.Marshal(gUsers)
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = ioutil.WriteFile("disco.txt", datosJson, 0644)
+	//defer file.Close()
+
 }
 
 // chk comprueba y sale si hay errores (ahorra escritura en programas sencillos)
@@ -103,13 +132,17 @@ func comparePassword(password []byte, hash []byte) bool {
 	return (subtle.ConstantTimeCompare(decodedHash, comparisonHash) == 1)
 }
 
-// mapa con todos los usuarios
-// (se podría serializar con JSON o Gob, etc. y escribir/leer de disco para persistencia)
-var gUsers map[string]user
-
 // gestiona el modo servidor
 func Run() {
-
+	leerEnDisco()
+	c := make(chan os.Signal)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-c
+		guardarEnDisco()
+		fmt.Println("SE ha salidooooo")
+		os.Exit(1)
+	}()
 	gUsers = make(map[string]user) // inicializamos mapa de usuarios
 	http.HandleFunc("/", handler)  // asignamos un handler global
 
@@ -159,6 +192,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		response(w, true, "Usuario registrado", u.Token)
 
 	case "login": // ** login
+		fmt.Println(gUsers)
 		u, ok := gUsers[req.Form.Get("user")] // ¿existe ya el usuario?
 		if !ok {
 			response(w, false, "Usuario inexistente", nil)
