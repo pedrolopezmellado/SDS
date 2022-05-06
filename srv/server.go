@@ -73,7 +73,7 @@ func leerEnDisco() {
 		log.Panicf("failed reading data from file: %s", err)
 	}
 	err = json.Unmarshal([]byte(data), &gUsers)
-	fmt.Println(gUsers)
+	//fmt.Println(gUsers)
 }
 
 func guardarEnDisco() {
@@ -189,7 +189,6 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		response(w, true, "Usuario registrado", u.Token)
 
 	case "login": // ** login
-		fmt.Println(gUsers)
 		u, ok := gUsers[req.Form.Get("user")] // ¿existe ya el usuario?
 		if !ok {
 			response(w, false, "Usuario inexistente", nil)
