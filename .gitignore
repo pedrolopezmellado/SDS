@@ -4,6 +4,7 @@
 *.dll
 *.so
 *.dylib
+disco.txt
 
 # Test binary, built with `go test -c`
 *.test
