@@ -63,21 +63,40 @@ type user struct {
 	Directorio directorio        // directorio del usuario
 }
 
+// config para generar hash
+var config = &PasswordConfig{
+	time:    1,
+	memory:  64 * 1024,
+	threads: 4,
+	keyLen:  32,
+}
+
+type datos struct {
+	usuarios    map[string]user
+	keyServidor []byte
+}
+
 // mapa con todos los usuarios
 // (se podría serializar con JSON o Gob, etc. y escribir/leer de disco para persistencia)
 var gUsers map[string]user
+var datosServidor datos
+var keyServidor []byte
 
-func leerEnDisco() {
+func leerEnDisco(keyServidor []byte) {
 	data, err := ioutil.ReadFile("disco.txt")
 	if err != nil {
 		log.Panicf("failed reading data from file: %s", err)
 	}
-	err = json.Unmarshal([]byte(data), &gUsers)
+	err = json.Unmarshal([]byte(data), &datosServidor)
+	gUsers = datosServidor.usuarios
+	keyServidor = datosServidor.keyServidor
 	//fmt.Println(gUsers)
 }
 
-func guardarEnDisco() {
-	datosJson, err := json.Marshal(gUsers)
+func guardarEnDisco(keyServidor []byte) {
+	datosServidor.keyServidor = keyServidor
+	datosServidor.usuarios = gUsers
+	datosJson, err := json.Marshal(datosServidor)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -92,8 +111,14 @@ func chk(e error) {
 	}
 }
 
-func generatePassword(c *PasswordConfig, password []byte, salt *[]byte) []byte {
-	hash := argon2.IDKey(password, *salt, c.time, c.memory, c.threads, c.keyLen)
+func generatePassword(password []byte, salt *[]byte) []byte {
+	config = &PasswordConfig{
+		time:    1,
+		memory:  64 * 1024,
+		threads: 4,
+		keyLen:  32,
+	}
+	hash := argon2.IDKey(password, *salt, config.time, config.memory, config.threads, config.keyLen)
 	nuevaSalt := base64.RawStdEncoding.EncodeToString(*salt)
 	nuevoHash := base64.RawStdEncoding.EncodeToString(hash)
 
@@ -101,7 +126,7 @@ func generatePassword(c *PasswordConfig, password []byte, salt *[]byte) []byte {
 	hash = []byte(nuevoHash)
 	format := "$argon2id$v=%d$m=%d,t=%d,p=%d$%s$%s"
 
-	return []byte(fmt.Sprintf(format, argon2.Version, c.memory, c.time, c.threads, *salt, hash))
+	return []byte(fmt.Sprintf(format, argon2.Version, config.memory, config.time, config.threads, *salt, hash))
 }
 
 func comparePassword(password []byte, hash []byte) bool {
@@ -132,12 +157,22 @@ func comparePassword(password []byte, hash []byte) bool {
 
 // gestiona el modo servidor
 func Run() {
-	leerEnDisco() //leemos la info de la app de disco.txt
+	clave, err := base64.StdEncoding.DecodeString("aGVsbG8gZnJvbSBnb3NhbXBsZXMuZGV2IGJhc2U2NCBlbmNvZGluZyBleGFtcGxlIQ==")
+	if err != nil {
+		panic(err)
+	}
+	if keyServidor == nil {
+		salt := make([]byte, 16) // sal (16 bytes == 128 bits)
+		rand.Read(salt)          // la sal es aleatoria
+		keyServidor = generatePassword(clave, &salt)
+	}
+
+	leerEnDisco(keyServidor) //leemos la info de la app de disco.txt
 	c := make(chan os.Signal)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-c
-		guardarEnDisco() //persistimos los datos en un fichero(disco.txt)
+		guardarEnDisco(keyServidor) //persistimos los datos en un fichero(disco.txt)
 		fmt.Println("Saliendo del servidor y persistiendo datos...")
 		os.Exit(1)
 	}()
@@ -148,12 +183,7 @@ func Run() {
 }
 
 func handler(w http.ResponseWriter, req *http.Request) {
-	config := &PasswordConfig{
-		time:    1,
-		memory:  64 * 1024,
-		threads: 4,
-		keyLen:  32,
-	}
+
 	req.ParseForm()                              // es necesario parsear el formulario
 	w.Header().Set("Content-Type", "text/plain") // cabecera estándar
 
@@ -180,7 +210,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
 
 		// "hasheamos" la contraseña con scrypt (argon2 es mejor)
 		//u.Hash, _ = scrypt.Key(password, u.Salt, 16384, 8, 1, 32)
-		u.Hash = generatePassword(config, password, &u.Salt)
+		u.Hash = generatePassword(password, &u.Salt)
 		u.Seen = time.Now()        // asignamos tiempo de login
 		u.Token = make([]byte, 16) // token (16 bytes == 128 bits)
 		rand.Read(u.Token)         // el token es aleatorio
