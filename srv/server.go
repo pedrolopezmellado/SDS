@@ -72,7 +72,6 @@ func leerEnDisco() {
 	if err != nil {
 		log.Panicf("failed reading data from file: %s", err)
 	}
-
 	err = json.Unmarshal([]byte(data), &gUsers)
 	fmt.Println(gUsers)
 }
@@ -84,7 +83,6 @@ func guardarEnDisco() {
 	}
 	err = ioutil.WriteFile("disco.txt", datosJson, 0644)
 	//defer file.Close()
-
 }
 
 // chk comprueba y sale si hay errores (ahorra escritura en programas sencillos)
@@ -134,17 +132,16 @@ func comparePassword(password []byte, hash []byte) bool {
 
 // gestiona el modo servidor
 func Run() {
-	leerEnDisco()
+	leerEnDisco() //leemos la info de la app de disco.txt
 	c := make(chan os.Signal)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-c
-		guardarEnDisco()
-		fmt.Println("SE ha salidooooo")
+		guardarEnDisco() //persistimos los datos en un fichero(disco.txt)
+		fmt.Println("Saliendo del servidor y persistiendo datos...")
 		os.Exit(1)
 	}()
-	gUsers = make(map[string]user) // inicializamos mapa de usuarios
-	http.HandleFunc("/", handler)  // asignamos un handler global
+	http.HandleFunc("/", handler) // asignamos un handler global
 
 	// escuchamos el puerto 10443 con https y comprobamos el error
 	chk(http.ListenAndServeTLS(":10443", "localhost.crt", "localhost.key", nil))
