@@ -24,6 +24,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/joho/godotenv"
 	"golang.org/x/crypto/argon2"
 )
 
@@ -76,34 +77,49 @@ var config = &PasswordConfig{
 var gUsers map[string]user
 var keyServidor []byte
 
-func leerEnDisco(keyServidor []byte) {
+func loadEnv() {
+	err := godotenv.Load()
+	if err != nil {
+		log.Panicf("failed reading data from .env: %s", err)
+	}
+}
+
+func leerEnDisco() {
 	dataUsuarios, err := ioutil.ReadFile("disco.txt")
 	if err != nil {
 		log.Panicf("failed reading data from file: %s", err)
 	}
-	err = json.Unmarshal([]byte(dataUsuarios), &gUsers)
 
-	dataKey, err := ioutil.ReadFile("disco.txt")
+	dataKey, err := ioutil.ReadFile("keyServidor.txt")
 	if err != nil {
 		log.Panicf("failed reading data from file: %s", err)
 	}
+
 	err = json.Unmarshal([]byte(dataKey), &keyServidor)
+	if len(dataUsuarios) > 0 {
+		dataUsuarios = util.Decrypt(dataUsuarios, keyServidor)
+
+		dataUsuarios = util.Decompress(dataUsuarios)
+		err = json.Unmarshal([]byte(dataUsuarios), &gUsers)
+	}
 
 	//fmt.Println(gUsers)
 }
 
-func guardarEnDisco(keyServidor []byte) {
+func guardarEnDisco() {
 
 	datosUsuarios, err := json.Marshal(gUsers)
-	fmt.Println(datosUsuarios)
 	if err != nil {
 		log.Fatal(err)
 	}
 	datosKey, err := json.Marshal(keyServidor)
-	fmt.Println(datosKey)
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	datosUsuarios = util.Compress(datosUsuarios)
+	datosUsuarios = util.Encrypt(datosUsuarios, keyServidor)
+
 	err = ioutil.WriteFile("disco.txt", datosUsuarios, 0644)
 	err = ioutil.WriteFile("keyServidor.txt", datosKey, 0644)
 
@@ -163,22 +179,21 @@ func comparePassword(password []byte, hash []byte) bool {
 
 // gestiona el modo servidor
 func Run() {
-	clave, err := base64.StdEncoding.DecodeString("aGVsbG8gZnJvbSBnb3NhbXBsZXMuZGV2IGJhc2U2NCBlbmNvZGluZyBleGFtcGxlIQ==")
-	if err != nil {
-		panic(err)
-	}
+	loadEnv()
+	clave := util.Decode64(os.Getenv("CLAVE")) // accedemos a la variable de entorno CLAVE
 	if keyServidor == nil {
 		salt := make([]byte, 16) // sal (16 bytes == 128 bits)
 		rand.Read(salt)          // la sal es aleatoria
-		keyServidor = generatePassword(clave, &salt)
+		keyServidor = argon2.IDKey(clave, salt, config.time, config.memory, config.threads, config.keyLen)
+		//keyServidor = generatePassword(clave, &salt) //hasheado con argon2
 	}
 
-	leerEnDisco(keyServidor) //leemos la info de la app de disco.txt
+	leerEnDisco() //leemos la info de la app de disco.txt
 	c := make(chan os.Signal)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-c
-		guardarEnDisco(keyServidor) //persistimos los datos en un fichero(disco.txt)
+		guardarEnDisco() //persistimos los datos en un fichero(disco.txt)
 		fmt.Println("Saliendo del servidor y persistiendo datos...")
 		os.Exit(1)
 	}()
