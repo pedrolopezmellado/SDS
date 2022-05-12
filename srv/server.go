@@ -71,45 +71,41 @@ var config = &PasswordConfig{
 	keyLen:  32,
 }
 
-type datos struct {
-	usuarios    map[string]user
-	keyServidor []byte
-}
-
 // mapa con todos los usuarios
 // (se podría serializar con JSON o Gob, etc. y escribir/leer de disco para persistencia)
 var gUsers map[string]user
-var datosServidor datos
 var keyServidor []byte
 
 func leerEnDisco(keyServidor []byte) {
-	data, err := ioutil.ReadFile("disco.txt")
+	dataUsuarios, err := ioutil.ReadFile("disco.txt")
 	if err != nil {
 		log.Panicf("failed reading data from file: %s", err)
 	}
-	err = json.Unmarshal([]byte(data), &datosServidor.keyServidor)
-	fmt.Println(datosServidor.keyServidor)
-	gUsers = datosServidor.usuarios
-	keyServidor = datosServidor.keyServidor
+	err = json.Unmarshal([]byte(dataUsuarios), &gUsers)
+
+	dataKey, err := ioutil.ReadFile("disco.txt")
+	if err != nil {
+		log.Panicf("failed reading data from file: %s", err)
+	}
+	err = json.Unmarshal([]byte(dataKey), &keyServidor)
+
 	//fmt.Println(gUsers)
 }
 
 func guardarEnDisco(keyServidor []byte) {
-	datosServidor.keyServidor = keyServidor
-	datosServidor.usuarios = gUsers
 
-	datosUsuarios, err := json.Marshal(datosServidor.usuarios)
+	datosUsuarios, err := json.Marshal(gUsers)
 	fmt.Println(datosUsuarios)
 	if err != nil {
 		log.Fatal(err)
 	}
-	datosKey, err := json.Marshal(datosServidor.keyServidor)
+	datosKey, err := json.Marshal(keyServidor)
 	fmt.Println(datosKey)
 	if err != nil {
 		log.Fatal(err)
 	}
-	datosJson := append(datosKey, datosUsuarios...)
-	err = ioutil.WriteFile("disco.txt", datosJson, 0644)
+	err = ioutil.WriteFile("disco.txt", datosUsuarios, 0644)
+	err = ioutil.WriteFile("keyServidor.txt", datosKey, 0644)
 
 	//defer file.Close()
 }
