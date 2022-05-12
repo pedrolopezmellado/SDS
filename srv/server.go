@@ -88,6 +88,7 @@ func leerEnDisco(keyServidor []byte) {
 		log.Panicf("failed reading data from file: %s", err)
 	}
 	err = json.Unmarshal([]byte(data), &datosServidor)
+	fmt.Println(datosServidor)
 	gUsers = datosServidor.usuarios
 	keyServidor = datosServidor.keyServidor
 	//fmt.Println(gUsers)
@@ -96,11 +97,20 @@ func leerEnDisco(keyServidor []byte) {
 func guardarEnDisco(keyServidor []byte) {
 	datosServidor.keyServidor = keyServidor
 	datosServidor.usuarios = gUsers
-	datosJson, err := json.Marshal(datosServidor)
+
+	datosUsuarios, err := json.Marshal(datosServidor.usuarios)
+	fmt.Println(datosUsuarios)
 	if err != nil {
 		log.Fatal(err)
 	}
+	datosKey, err := json.Marshal(datosServidor.keyServidor)
+	fmt.Println(datosKey)
+	if err != nil {
+		log.Fatal(err)
+	}
+	datosJson := append(datosKey, datosUsuarios...)
 	err = ioutil.WriteFile("disco.txt", datosJson, 0644)
+
 	//defer file.Close()
 }
 
