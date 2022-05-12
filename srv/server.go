@@ -96,7 +96,9 @@ func leerEnDisco(keyServidor []byte) {
 func guardarEnDisco(keyServidor []byte) {
 	datosServidor.keyServidor = keyServidor
 	datosServidor.usuarios = gUsers
-	datosJson, err := json.Marshal(datosServidor)
+
+	datosJson, err := json.Marshal(datos{usuarios: gUsers, keyServidor: keyServidor})
+	fmt.Println("aaa: " + string(datosJson))
 	if err != nil {
 		log.Fatal(err)
 	}
