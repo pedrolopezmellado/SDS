@@ -214,6 +214,9 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		u.Seen = time.Now()        // asignamos tiempo de login
 		u.Token = make([]byte, 16) // token (16 bytes == 128 bits)
 		rand.Read(u.Token)         // el token es aleatorio
+		if gUsers == nil {
+			gUsers = make(map[string]user)
+		}
 		gUsers[u.Name] = u
 		fmt.Println("Usuarios despues de hacer el registro: " + strconv.Itoa(len(gUsers)))
 		response(w, true, "Usuario registrado", u.Token)
