@@ -7,12 +7,9 @@ package srv
 
 import (
 	"bytes"
-	"crypto"
 	"crypto/rand"
-	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/subtle"
-	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -89,8 +86,17 @@ var config = &PasswordConfig{
 // mapa con todos los usuarios
 // (se podría serializar con JSON o Gob, etc. y escribir/leer de disco para persistencia)
 var gUsers map[string]user
+
+// mapa donde almacenamos las copias de los ficheros compartidos entre usuarios
 var ficherosCompartidos map[string]ficheroCompartido
 var keyServidor []byte
+
+// chk comprueba y sale si hay errores (ahorra escritura en programas sencillos)
+func chk(e error) {
+	if e != nil {
+		panic(e)
+	}
+}
 
 // función para resumir (SHA256)
 func hash(data []byte) []byte {
@@ -131,13 +137,9 @@ func leerEnDisco() {
 func guardarEnDisco() {
 
 	datosUsuarios, err := json.Marshal(gUsers)
-	if err != nil {
-		log.Fatal(err)
-	}
+	chk(err)
 	datosKey, err := json.Marshal(keyServidor)
-	if err != nil {
-		log.Fatal(err)
-	}
+	chk(err)
 
 	datosUsuarios = util.Compress(datosUsuarios)
 	datosUsuarios = util.Encrypt(datosUsuarios, keyServidor)
@@ -146,13 +148,6 @@ func guardarEnDisco() {
 	err = ioutil.WriteFile("keyServidor.txt", datosKey, 0644)
 
 	//defer file.Close()
-}
-
-// chk comprueba y sale si hay errores (ahorra escritura en programas sencillos)
-func chk(e error) {
-	if e != nil {
-		panic(e)
-	}
 }
 
 func generatePassword(password []byte, salt *[]byte) []byte {
@@ -501,7 +496,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
 			}
 
 			usuarioShare, okUser := gUsers[nombreUsuario] // ¿existe ya el usuario?
-			ficheroUsuario, okFichero := gUsers[u.Name].Directorio.Ficheros[nombreFichero]
+			_, okFichero := gUsers[u.Name].Directorio.Ficheros[nombreFichero]
 			if !okFichero {
 				response(w, false, "No existe ningún fichero con ese nombre", u.Token)
 				return
@@ -510,12 +505,13 @@ func handler(w http.ResponseWriter, req *http.Request) {
 					response(w, false, "El usuario al que desea compartir su fichero no existe", u.Token)
 					return
 				} else {
-
-					key := make([]byte, 32) // clave aleatoria de cifrado (AES)
+					//Realizamos RSA con firma digital
+					/*key := make([]byte, 32) // clave aleatoria de cifrado (AES)
 					rand.Read(key)
 					ficheroJson, err := json.Marshal(ficheroUsuario)
 					chk(err)
-					ficheroEncriptado := util.Encrypt(util.Compress([]byte(ficheroJson)), key)          // encriptamos fichero con clave aleatoria
+					ficheroEncriptado := util.Encrypt(util.Compress([]byte(ficheroJson)), key) // encriptamos fichero con clave aleatoria
+					fmt.Println(ficheroEncriptado)
 					keyPubDestino, err := x509.ParsePKCS1PublicKey([]byte(usuarioShare.Data["public"])) // parseamos la clave publica del usuario destino
 					chk(err)
 					keyCifrada, err := rsa.EncryptOAEP(sha256.New(), rand.Reader, keyPubDestino, key, nil) // encriptamos clave con clave publica del usuario destino
@@ -534,10 +530,10 @@ func handler(w http.ResponseWriter, req *http.Request) {
 						RandomKey:         keyCifrada,
 						Firma:             firma,
 					}
-					ficherosCompartidos[ficheroCompartido.Nombre] = ficheroCompartido
+					ficherosCompartidos[ficheroCompartido.Nombre] = ficheroCompartido*/
 
 					gUsers[u.Name].Directorio.Ficheros[nombreFichero].SharedUsers[usuarioShare.Name] = usuarioShare
-					fmt.Println(gUsers[u.Name].Directorio.Ficheros[nombreFichero].SharedUsers)
+					//fmt.Println(gUsers[u.Name].Directorio.Ficheros[nombreFichero].SharedUsers)
 					response(w, true, "Fichero compartido con "+usuarioShare.Name, u.Token)
 					return
 				}
