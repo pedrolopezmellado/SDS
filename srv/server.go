@@ -539,6 +539,42 @@ func handler(w http.ResponseWriter, req *http.Request) {
 				}
 			}
 		}
+	case "unshare":
+		u, ok := gUsers[req.Form.Get("user")] // ¿existe ya el usuario?
+		if !ok {
+			response(w, false, "No autentificado", nil)
+			return
+		} else if (u.Token == nil) || (time.Since(u.Seen).Minutes() > 60) {
+			// sin token o con token expirado
+			response(w, false, "No autentificado", nil)
+			return
+		} else {
+			nombreFichero := req.Form.Get("nombreFichero")
+			nombreUsuario := req.Form.Get("userUnshare")
+			nombreUsuario = nombreUsuario[:len(nombreUsuario)-2]
+
+			if nombreUsuario == u.Name {
+				response(w, false, "No puedes descompartir un fichero contigo mismo", u.Token)
+				return
+			}
+
+			usuarioUnshare, okUser := gUsers[nombreUsuario] // ¿existe el usuario?
+			_, okFichero := gUsers[u.Name].Directorio.Ficheros[nombreFichero]
+			if !okFichero {
+				response(w, false, "No existe ningún fichero con ese nombre", u.Token)
+				return
+			} else {
+				if !okUser {
+					response(w, false, "El usuario al que desea compartir su fichero no existe", u.Token)
+					return
+				} else {
+					delete(gUsers[u.Name].Directorio.Ficheros[nombreFichero].SharedUsers, usuarioUnshare.Name)
+					//fmt.Println(gUsers[u.Name].Directorio.Ficheros[nombreFichero].SharedUsers)
+					response(w, true, "Fichero descompartido con "+usuarioUnshare.Name, u.Token)
+					return
+				}
+			}
+		}
 	case "public":
 		u, ok := gUsers[req.Form.Get("user")] // ¿existe ya el usuario?
 

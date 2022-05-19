@@ -231,6 +231,21 @@ func shareComando(nombreFichero string, usuario string, client *http.Client) {
 	r.Body.Close() // hay que cerrar el reader del body
 }
 
+func unshareComando(nombreFichero string, usuario string, client *http.Client) {
+	data := url.Values{}
+	data.Set("cmd", "unshare")      // comando (string)
+	data.Set("user", usuarioActual) // usuario (string)
+	data.Set("nombreFichero", nombreFichero)
+	data.Set("userUnshare", usuario)
+
+	r, err := client.PostForm("https://localhost:10443", data) // enviamos por POST
+	chk(err)
+	resp := srv.Resp{}
+	json.NewDecoder(r.Body).Decode(&resp) // decodificamos la respuesta para utilizar sus campos más adelante
+	fmt.Println(resp.Msg)
+	r.Body.Close() // hay que cerrar el reader del body
+}
+
 func publicComando(nombreFichero string, client *http.Client) {
 	data := url.Values{}
 	data.Set("cmd", "public")       // comando (string)
@@ -436,6 +451,19 @@ func accionComando(cadena string) {
 			}
 		}
 		break
+	case "unshare":
+		if !moreCommands {
+			fmt.Println("Debes introducir el nombre del fichero y del usuario a compartir")
+		} else {
+			if len(trozos) == 2 || len(trozos) > 3 {
+				fmt.Println("Debes introducir el nombre del fichero y del usuario a compartir únicamente")
+			} else if len(trozos) == 3 {
+				nombreFichero := trozos[1]
+				usuario := trozos[2]
+				unshareComando(nombreFichero, usuario, client)
+			}
+		}
+		break
 	case "public":
 		if !moreCommands {
 			fmt.Println("Debes introducir el nombre del fichero como argumento")
@@ -496,6 +524,7 @@ cat [nombre_fichero] 				Muestra el contenido del fichero
 upload [nombre_fichero]				Sube un fichero de la carpeta ficheros
 delete [nombre_fichero]				Elimina un fichero
 share [nombre_fichero] [nombre_usuario]		Comparte el fichero con otro usuario
+unshare [nombre_fichero] [nombre_usuario]	Descomparte el fichero con otro usuario
 public [nombre_fichero]				Pone el fichero público para los demás usuarios
 private [nombre_fichero]			Pone el fichero privado
 note [nombre_fichero] 				Escribe una nota en el fichero
