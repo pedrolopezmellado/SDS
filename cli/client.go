@@ -43,6 +43,7 @@ type fichero struct {
 	Extension     string
 	NumRevisiones int
 	FechaCreacion time.Time
+	Version       int
 }
 
 type user struct {
@@ -339,7 +340,7 @@ func detailsComando(nombreFichero string, client *http.Client) {
 	json.Unmarshal([]byte(resp.Msg), &fichero)
 	if resp.Ok {
 		//Mostramos el contenido del fichero
-		fmt.Println("Nombre: " + fichero.Nombre)
+		fmt.Println("Nombre: " + strings.Split(fichero.Nombre, "/")[0])
 		fmt.Println("Contenido: " + fichero.Contenido)
 		fmt.Println("Autor: " + fichero.Autor)
 		fmt.Println("Public: " + strconv.FormatBool(fichero.Public))
@@ -364,6 +365,7 @@ func detailsComando(nombreFichero string, client *http.Client) {
 		fmt.Println("Formato: " + fichero.Extension)
 		fmt.Println("Número de revisiones: " + strconv.Itoa(fichero.NumRevisiones))
 		fmt.Println("Fecha de creación: " + fichero.FechaCreacion.Format("2006-01-02 15:04:05"))
+		fmt.Println("Versión: " + strconv.Itoa(fichero.Version))
 	} else {
 		fmt.Println(resp.Msg)
 	}

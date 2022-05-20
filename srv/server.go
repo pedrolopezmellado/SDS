@@ -47,6 +47,7 @@ type fichero struct {
 	Extension     string
 	NumRevisiones int
 	FechaCreacion time.Time
+	Version       int
 }
 
 type ficheroCompartido struct {
@@ -88,6 +89,9 @@ var config = &PasswordConfig{
 	keyLen:  32,
 }
 
+//maximo de versiones que puede tener un fichero
+const maxVersion int = 5
+
 // mapa con todos los usuarios
 // (se podría serializar con JSON o Gob, etc. y escribir/leer de disco para persistencia)
 var gUsers map[string]user
@@ -123,8 +127,21 @@ func obtenerExtension(nombreFichero string) string {
 	if len(trozos) != 2 {
 		return "error"
 	}
-
 	return trozos[1]
+}
+
+func existeFichero(nombreFichero string, ficheros map[string]fichero) (fichero, bool) {
+	//empezamos desde la ultima posible version para coger el fichero más reciente
+	var ficheroResultado fichero
+	var existe bool
+	for i := maxVersion; i >= 1; i-- {
+		key := nombreFichero + "/v" + strconv.Itoa(i)
+		fmt.Println(key)
+		if ficheroResultado, existe := ficheros[key]; existe {
+			return ficheroResultado, existe
+		}
+	}
+	return ficheroResultado, existe
 }
 
 func leerEnDisco() {
@@ -308,17 +325,22 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		contenidoFichero := req.Form.Get("contenidoFichero")
 		nombreFichero := req.Form.Get("nombreFichero")
 
-		ficheroActual, okFichero := gUsers[u.Name].Directorio.Ficheros[nombreFichero]
-		if okFichero {
-			response(w, false, "El fichero "+ficheroActual.Nombre+" ya existe", u.Token)
-			return
-		}
-
+		ficheroActual, okFichero := existeFichero(nombreFichero, gUsers[u.Name].Directorio.Ficheros)
+		fmt.Println(ficheroActual)
 		ext := obtenerExtension(nombreFichero)
 
 		if ext == "error" {
 			response(w, false, "El nombre del fichero debe seguir el formato <nombre>.<extension>", u.Token)
 		} else {
+			var version int
+			if okFichero {
+				version = ficheroActual.Version + 1
+				fmt.Println(version)
+				nombreFichero = nombreFichero + "/v" + strconv.Itoa(version)
+			} else {
+				version = 1
+				nombreFichero = nombreFichero + "/v1"
+			}
 			miFichero := fichero{
 				Nombre:        nombreFichero,
 				Contenido:     contenidoFichero,
@@ -328,6 +350,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
 				NumCaracteres: len(contenidoFichero),
 				Extension:     ext,
 				FechaCreacion: time.Now(),
+				Version:       version,
 			}
 			gUsers[u.Name].Directorio.Ficheros[nombreFichero] = miFichero
 			mensaje := "Fichero subido correctamente"
@@ -500,6 +523,23 @@ func handler(w http.ResponseWriter, req *http.Request) {
 			if ext == "error" {
 				response(w, false, "El nombre del fichero debe seguir el formato <nombre>.<extension>", u.Token)
 			} else {
+				var version int
+				ficheroExistente, existeFichero := existeFichero(nombreFichero, gUsers[u.Name].Directorio.Ficheros)
+				fmt.Println(ficheroExistente)
+				if existeFichero {
+					fmt.Print("estot: ")
+					fmt.Println(ficheroExistente.Version)
+					version = ficheroExistente.Version + 1
+					if version > maxVersion {
+						response(w, false, "Has alcanzado el número máximo de versiones para el fichero", u.Token)
+						return
+					}
+					nombreFichero = nombreFichero + "/v" + strconv.Itoa(version)
+					fmt.Println(nombreFichero)
+				} else {
+					version = 1
+					nombreFichero = nombreFichero + "/v1"
+				}
 				miFichero := fichero{
 					Nombre:        nombreFichero,
 					Contenido:     contenido,
@@ -508,11 +548,10 @@ func handler(w http.ResponseWriter, req *http.Request) {
 					SharedUsers:   make(map[string]user),
 					NumCaracteres: len(contenido),
 					Extension:     ext,
-					//COMPROBAR QUE NUMREVISIONES SE INICIALIZA A 0
 					FechaCreacion: time.Now(),
+					Version:       version,
 				}
 				gUsers[u.Name].Directorio.Ficheros[miFichero.Nombre] = miFichero
-				fmt.Println(miFichero)
 				response(w, true, "Fichero creado", u.Token)
 			}
 		}
