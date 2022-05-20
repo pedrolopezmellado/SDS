@@ -346,7 +346,7 @@ func detailsComando(nombreFichero string, client *http.Client) {
 		if len(fichero.SharedUsers) > 0 {
 			fmt.Println("------------------------------------------------------------")
 			fmt.Print("Usuarios compartidos: ")
-			for key, _ := range fichero.SharedUsers {
+			for key := range fichero.SharedUsers {
 				fmt.Print(key)
 			}
 			fmt.Println()
@@ -434,7 +434,6 @@ func accionComando(cadena string) {
 		} else {
 			lsComando(client)
 		}
-		break
 	case "cd":
 		if moreCommands {
 			directorio := trozos[1]
@@ -442,7 +441,6 @@ func accionComando(cadena string) {
 		} else {
 			ruta = "/"
 		}
-		break
 	case "touch":
 		if !moreCommands {
 			fmt.Println("Debes introducir el nombre del fichero como argumento")
@@ -454,7 +452,6 @@ func accionComando(cadena string) {
 				touchComando(nombreFichero, client)
 			}
 		}
-		break
 	case "cat":
 		if len(trozos) != 2 {
 			fmt.Println("Error al introducir argumentos")
@@ -462,7 +459,6 @@ func accionComando(cadena string) {
 			nombreFichero := trozos[1]
 			catComando(nombreFichero, client)
 		}
-		break
 	case "upload":
 		if len(trozos) != 2 {
 			fmt.Println("Error al introducir argumentos")
@@ -470,7 +466,6 @@ func accionComando(cadena string) {
 			nombreFichero := trozos[1]
 			uploadComando(nombreFichero, client)
 		}
-		break
 	case "delete":
 		if len(trozos) != 2 {
 			fmt.Println("Error al introducir argumentos")
@@ -478,7 +473,6 @@ func accionComando(cadena string) {
 			nombreFichero := trozos[1]
 			deleteComando(nombreFichero, client)
 		}
-		break
 	case "details":
 		if len(trozos) != 2 {
 			fmt.Println("Error al introducir argumentos")
@@ -486,7 +480,6 @@ func accionComando(cadena string) {
 			nombreFichero := trozos[1]
 			detailsComando(nombreFichero, client)
 		}
-		break
 	case "share":
 		if !moreCommands {
 			fmt.Println("Debes introducir el nombre del fichero y del usuario a compartir")
@@ -499,7 +492,6 @@ func accionComando(cadena string) {
 				shareComando(nombreFichero, usuario, client)
 			}
 		}
-		break
 	case "unshare":
 		if !moreCommands {
 			fmt.Println("Debes introducir el nombre del fichero y del usuario a compartir")
@@ -512,7 +504,6 @@ func accionComando(cadena string) {
 				unshareComando(nombreFichero, usuario, client)
 			}
 		}
-		break
 	case "public":
 		if !moreCommands {
 			fmt.Println("Debes introducir el nombre del fichero como argumento")
@@ -524,7 +515,6 @@ func accionComando(cadena string) {
 				publicComando(nombreFichero, client)
 			}
 		}
-		break
 	case "private":
 		if !moreCommands {
 			fmt.Println("Debes introducir el nombre del fichero como argumento")
@@ -536,7 +526,6 @@ func accionComando(cadena string) {
 				privateComando(nombreFichero, client)
 			}
 		}
-		break
 	case "note":
 		if !moreCommands {
 			fmt.Println("Debes introducir el nombre del fichero como argumento")
@@ -548,13 +537,10 @@ func accionComando(cadena string) {
 				noteComando(nombreFichero, client)
 			}
 		}
-
 	case "exit":
 		exit = true
-		break
 	default:
 		fmt.Println("Error al introducir el comando")
-		break
 	}
 }
 
@@ -637,13 +623,10 @@ func Run() {
 		switch opcion {
 		case 1:
 			registro(pubJSON, pkJSON, client)
-			break
 		case 2:
 			login(client)
-			break
 		default:
 			fmt.Println("Hasta luego!!")
-			break
 		}
 	}
 }
