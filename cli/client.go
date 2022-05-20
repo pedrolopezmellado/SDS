@@ -18,6 +18,7 @@ import (
 	"os"
 	"sdspractica/srv"
 	"sdspractica/util"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -32,11 +33,16 @@ type nota struct {
 }
 
 type fichero struct {
-	Nombre      string
-	Contenido   string
-	Public      bool
-	SharedUsers map[string]user
-	Notas       []nota
+	Nombre        string
+	Contenido     string
+	Autor         string
+	Public        bool
+	SharedUsers   map[string]user
+	Notas         []nota
+	NumCaracteres int
+	Extension     string
+	NumRevisiones int
+	FechaCreacion time.Time
 }
 
 type user struct {
@@ -132,7 +138,6 @@ func login(client *http.Client) {
 }
 
 func menuLogin() {
-
 	cadena := ""
 	exit = false
 
@@ -290,19 +295,8 @@ func catComando(nombreFichero string, client *http.Client) {
 	json.Unmarshal([]byte(resp.Msg), &fichero)
 	if resp.Ok {
 		//Mostramos el contenido del fichero
-		fmt.Println("\nNombre: " + fichero.Nombre)
-		fmt.Println(fichero.Contenido + "\n")
-
-		if len(fichero.Notas) > 0 {
-			fmt.Println("------------------------------------------------------------")
-			fmt.Print("Notas\n\n")
-			for i := 0; i < len(fichero.Notas); i++ {
-				fmt.Println("Autor: " + fichero.Notas[i].Usuario)
-				fmt.Println(fichero.Notas[i].Contenido + "\n")
-				fmt.Println("------------------------------------------------------------")
-			}
-		}
-
+		fmt.Println("Nombre: " + fichero.Nombre)
+		fmt.Println(fichero.Contenido)
 	} else {
 		fmt.Println(resp.Msg)
 	}
@@ -323,6 +317,54 @@ func deleteComando(nombreFichero string, client *http.Client) {
 	//fmt.Println(resp)                     // imprimimos por pantalla
 	if resp.Ok {
 		fmt.Println(resp.Msg)
+	} else {
+		fmt.Println(resp.Msg)
+	}
+	r.Body.Close() // hay que cerrar el reader del body
+}
+
+func detailsComando(nombreFichero string, client *http.Client) {
+	data := url.Values{}                     // estructura para contener los valores
+	data.Set("cmd", "details")               // comando (string)
+	data.Set("user", usuarioActual)          // usuario (string)
+	data.Set("nombreFichero", nombreFichero) // nombre del fichero (string)
+	data.Set("ruta", ruta)                   // ruta (string)
+
+	r, err := client.PostForm("https://localhost:10443", data) // enviamos por POST
+	chk(err)
+	resp := srv.Resp{}
+	json.NewDecoder(r.Body).Decode(&resp) // decodificamos la respuesta para utilizar sus campos más adelante
+	//fmt.Println(resp)                     // imprimimos por pantalla
+	var fichero fichero
+	json.Unmarshal([]byte(resp.Msg), &fichero)
+	if resp.Ok {
+		//Mostramos el contenido del fichero
+		fmt.Println("\nNombre: " + fichero.Nombre)
+		fmt.Println("Contenido: " + fichero.Contenido)
+		fmt.Println("Autor: " + fichero.Autor)
+		fmt.Println("Public: " + strconv.FormatBool(fichero.Public))
+		if len(fichero.SharedUsers) > 0 {
+			fmt.Println("------------------------------------------------------------")
+			fmt.Print("Usuarios compartidos: ")
+			for key, _ := range fichero.SharedUsers {
+				fmt.Print(key)
+			}
+			fmt.Println()
+		}
+		if len(fichero.Notas) > 0 {
+			fmt.Println("------------------------------------------------------------")
+			fmt.Print("Notas\n\n")
+			for i := 0; i < len(fichero.Notas); i++ {
+				fmt.Println("Autor: " + fichero.Notas[i].Usuario)
+				fmt.Println(fichero.Notas[i].Contenido + "\n")
+				fmt.Println("------------------------------------------------------------")
+			}
+		}
+		fmt.Println("Número de carácteres: " + strconv.Itoa(fichero.NumCaracteres))
+		fmt.Println("Formato: " + fichero.Extension)
+		fmt.Println("Número de revisiones: " + strconv.Itoa(fichero.NumRevisiones))
+		fmt.Println("Fecha de creación: " + fichero.FechaCreacion.Format("2006-01-02 15:04:05"))
+		fmt.Println()
 	} else {
 		fmt.Println(resp.Msg)
 	}
@@ -438,6 +480,14 @@ func accionComando(cadena string) {
 			deleteComando(nombreFichero, client)
 		}
 		break
+	case "details":
+		if len(trozos) != 2 {
+			fmt.Println("Error al introducir argumentos")
+		} else {
+			nombreFichero := trozos[1]
+			detailsComando(nombreFichero, client)
+		}
+		break
 	case "share":
 		if !moreCommands {
 			fmt.Println("Debes introducir el nombre del fichero y del usuario a compartir")
@@ -522,6 +572,7 @@ cd [nombre_usuario]				Te lleva al directorio del usuario
 touch [nombre_fichero] 				Crea un fichero en la ruta
 cat [nombre_fichero] 				Muestra el contenido del fichero
 upload [nombre_fichero]				Sube un fichero de la carpeta ficheros
+details [nombre_fichero]			Muestra los detalles(metadatos) del fichero
 delete [nombre_fichero]				Elimina un fichero
 share [nombre_fichero] [nombre_usuario]		Comparte el fichero con otro usuario
 unshare [nombre_fichero] [nombre_usuario]	Descomparte el fichero con otro usuario
