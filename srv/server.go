@@ -37,12 +37,17 @@ type PasswordConfig struct {
 }
 
 type fichero struct {
-	Nombre      string
-	Contenido   string
-	Public      bool
-	SharedUsers map[string]user
-	Version     float32
-	Notas       []nota
+	Nombre        string
+	Contenido     string
+	Autor         string
+	Public        bool
+	SharedUsers   map[string]user
+	Notas         []nota
+	NumCaracteres int
+	Extension     string
+	NumRevisiones int
+	FechaCreacion time.Time
+	Version       int
 }
 
 type ficheroCompartido struct {
@@ -84,6 +89,9 @@ var config = &PasswordConfig{
 	keyLen:  32,
 }
 
+//maximo de versiones que puede tener un fichero
+const maxVersion int = 5
+
 // mapa con todos los usuarios
 // (se podría serializar con JSON o Gob, etc. y escribir/leer de disco para persistencia)
 var gUsers map[string]user
@@ -111,6 +119,29 @@ func loadEnv() {
 	if err != nil {
 		log.Panicf("failed reading data from .env: %s", err)
 	}
+}
+
+func obtenerExtension(nombreFichero string) string {
+	trozos := strings.Split(nombreFichero, ".")
+
+	if len(trozos) != 2 {
+		return "error"
+	}
+	return trozos[1]
+}
+
+func existeFichero(nombreFichero string, ficheros map[string]fichero) (fichero, bool) {
+	//empezamos desde la ultima posible version para coger el fichero más reciente
+	var ficheroResultado fichero
+	var existe bool
+	for i := maxVersion; i >= 1; i-- {
+		key := nombreFichero + "/v" + strconv.Itoa(i)
+		fmt.Println(key)
+		if ficheroResultado, existe := ficheros[key]; existe {
+			return ficheroResultado, existe
+		}
+	}
+	return ficheroResultado, existe
 }
 
 func leerEnDisco() {
@@ -293,24 +324,86 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		contenidoFichero := req.Form.Get("contenidoFichero")
 		nombreFichero := req.Form.Get("nombreFichero")
 
-		ficheroActual, okFichero := gUsers[u.Name].Directorio.Ficheros[nombreFichero]
-		if okFichero {
-			response(w, false, "El fichero "+ficheroActual.Nombre+" ya existe", u.Token)
+		ficheroActual, okFichero := existeFichero(nombreFichero, gUsers[u.Name].Directorio.Ficheros)
+		fmt.Println(ficheroActual)
+		ext := obtenerExtension(nombreFichero)
+
+		if ext == "error" {
+			response(w, false, "El nombre del fichero debe seguir el formato <nombre>.<extension>", u.Token)
+		} else {
+			var version int
+			if okFichero {
+				version = ficheroActual.Version + 1
+				fmt.Println(version)
+				nombreFichero = nombreFichero + "/v" + strconv.Itoa(version)
+			} else {
+				version = 1
+				nombreFichero = nombreFichero + "/v1"
+			}
+			miFichero := fichero{
+				Nombre:        nombreFichero,
+				Contenido:     contenidoFichero,
+				Autor:         u.Name,
+				Public:        false,
+				SharedUsers:   make(map[string]user),
+				NumCaracteres: len(contenidoFichero),
+				Extension:     ext,
+				FechaCreacion: time.Now(),
+				Version:       version,
+			}
+			gUsers[u.Name].Directorio.Ficheros[nombreFichero] = miFichero
+			mensaje := "Fichero subido correctamente"
+			response(w, true, mensaje, u.Token)
+		}
+	case "cat":
+		u, ok := gUsers[req.Form.Get("user")] // ¿existe ya el usuario?
+		if !ok {
+			response(w, false, "Usuario inexistente", nil)
 			return
 		}
-		nombreFichero = nombreFichero + "/1.0"
-		miFichero := fichero{
-			Nombre:      nombreFichero,
-			Contenido:   contenidoFichero,
-			Public:      false,
-			SharedUsers: make(map[string]user),
-			Version:     1.0,
+		nombreFichero := req.Form.Get("nombreFichero")
+		nombreFichero = nombreFichero[:len(nombreFichero)-2]
+		ruta := req.Form.Get("ruta")
+		usuario := ruta[1:]
+		fichero, okFichero := gUsers[usuario].Directorio.Ficheros[nombreFichero]
+		if !okFichero {
+			response(w, false, "El fichero no existe", u.Token)
+			return
+		} else if u.Name != usuario { // si el usuario que hace la peticion no es el autor del fichero
+			_, existe := fichero.SharedUsers[u.Name]
+			if fichero.Public || existe { // comprobamos que el usuario tiene permisos
+				fichero.NumRevisiones++
+				gUsers[usuario].Directorio.Ficheros[nombreFichero] = fichero
+				datos, err := json.Marshal(&fichero) //
+				chk(err)
+				response(w, true, string(datos), u.Token)
+			} else {
+				response(w, false, "El usuario no tiene permisos", u.Token)
+			}
+			return
 		}
-		gUsers[u.Name].Directorio.Ficheros[nombreFichero] = miFichero
-		mensaje := "Fichero subido correctamente"
-		response(w, true, mensaje, u.Token)
+		fichero.NumRevisiones++
+		gUsers[usuario].Directorio.Ficheros[nombreFichero] = fichero
+		datos, err := json.Marshal(&fichero) //
+		chk(err)
+		response(w, true, string(datos), u.Token)
 
-	case "cat":
+	case "delete":
+		u, ok := gUsers[req.Form.Get("user")] // ¿existe ya el usuario?
+		if !ok {
+			response(w, false, "Usuario inexistente", nil)
+			return
+		}
+		nombreFichero := req.Form.Get("nombreFichero")
+		nombreFichero = nombreFichero[:len(nombreFichero)-2]
+		fichero, okFichero := gUsers[u.Name].Directorio.Ficheros[nombreFichero]
+		if !okFichero {
+			response(w, false, "El fichero no existe", u.Token)
+			return
+		}
+		delete(gUsers[u.Name].Directorio.Ficheros, fichero.Nombre)
+		response(w, true, "Fichero eliminado correctamente", u.Token)
+	case "details":
 		u, ok := gUsers[req.Form.Get("user")] // ¿existe ya el usuario?
 		if !ok {
 			response(w, false, "Usuario inexistente", nil)
@@ -338,24 +431,6 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		datos, err := json.Marshal(&fichero) //
 		chk(err)
 		response(w, true, string(datos), u.Token)
-
-	case "delete":
-		u, ok := gUsers[req.Form.Get("user")] // ¿existe ya el usuario?
-		if !ok {
-			response(w, false, "Usuario inexistente", nil)
-			return
-		}
-		nombreFichero := req.Form.Get("nombreFichero")
-		nombreFichero = nombreFichero[:len(nombreFichero)-2]
-		fmt.Println(nombreFichero)
-		fichero, okFichero := gUsers[u.Name].Directorio.Ficheros[nombreFichero]
-		if !okFichero {
-			response(w, false, "El fichero no existe", u.Token)
-			return
-		}
-		delete(gUsers[u.Name].Directorio.Ficheros, fichero.Nombre)
-		response(w, true, "Fichero eliminado correctamente", u.Token)
-
 	case "data": // ** obtener datos de usuario
 		u, ok := gUsers[req.Form.Get("user")] // ¿existe ya el usuario?
 		if !ok {
@@ -376,7 +451,6 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		u.Seen = time.Now()
 		gUsers[u.Name] = u
 		response(w, true, string(datos), u.Token)
-
 	case "ls":
 		//casos:
 		//mostrar los directorios de todos los usuarios si estas en el directorio raiz
@@ -443,14 +517,42 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		} else {
 			nombreFichero := req.Form.Get("nombreFichero")
 			nombreFichero = nombreFichero[:len(nombreFichero)-2]
-			miFichero := fichero{
-				Nombre:      nombreFichero,
-				Contenido:   contenido,
-				Public:      false,
-				SharedUsers: make(map[string]user),
+			ext := obtenerExtension(nombreFichero)
+
+			if ext == "error" {
+				response(w, false, "El nombre del fichero debe seguir el formato <nombre>.<extension>", u.Token)
+			} else {
+				var version int
+				ficheroExistente, existeFichero := existeFichero(nombreFichero, gUsers[u.Name].Directorio.Ficheros)
+				fmt.Println(ficheroExistente)
+				if existeFichero {
+					fmt.Print("estot: ")
+					fmt.Println(ficheroExistente.Version)
+					version = ficheroExistente.Version + 1
+					if version > maxVersion {
+						response(w, false, "Has alcanzado el número máximo de versiones para el fichero", u.Token)
+						return
+					}
+					nombreFichero = nombreFichero + "/v" + strconv.Itoa(version)
+					fmt.Println(nombreFichero)
+				} else {
+					version = 1
+					nombreFichero = nombreFichero + "/v1"
+				}
+				miFichero := fichero{
+					Nombre:        nombreFichero,
+					Contenido:     contenido,
+					Autor:         u.Name,
+					Public:        false,
+					SharedUsers:   make(map[string]user),
+					NumCaracteres: len(contenido),
+					Extension:     ext,
+					FechaCreacion: time.Now(),
+					Version:       version,
+				}
+				gUsers[u.Name].Directorio.Ficheros[miFichero.Nombre] = miFichero
+				response(w, true, "Fichero creado", u.Token)
 			}
-			gUsers[u.Name].Directorio.Ficheros[miFichero.Nombre] = miFichero
-			response(w, true, "Fichero creado", u.Token)
 		}
 	case "cd":
 		u, ok := gUsers[req.Form.Get("user")] // ¿existe ya el usuario?
@@ -542,6 +644,42 @@ func handler(w http.ResponseWriter, req *http.Request) {
 				}
 			}
 		}
+	case "unshare":
+		u, ok := gUsers[req.Form.Get("user")] // ¿existe ya el usuario?
+		if !ok {
+			response(w, false, "No autentificado", nil)
+			return
+		} else if (u.Token == nil) || (time.Since(u.Seen).Minutes() > 60) {
+			// sin token o con token expirado
+			response(w, false, "No autentificado", nil)
+			return
+		} else {
+			nombreFichero := req.Form.Get("nombreFichero")
+			nombreUsuario := req.Form.Get("userUnshare")
+			nombreUsuario = nombreUsuario[:len(nombreUsuario)-2]
+
+			if nombreUsuario == u.Name {
+				response(w, false, "No puedes descompartir un fichero contigo mismo", u.Token)
+				return
+			}
+
+			usuarioUnshare, okUser := gUsers[nombreUsuario] // ¿existe el usuario?
+			_, okFichero := gUsers[u.Name].Directorio.Ficheros[nombreFichero]
+			if !okFichero {
+				response(w, false, "No existe ningún fichero con ese nombre", u.Token)
+				return
+			} else {
+				if !okUser {
+					response(w, false, "El usuario al que desea compartir su fichero no existe", u.Token)
+					return
+				} else {
+					delete(gUsers[u.Name].Directorio.Ficheros[nombreFichero].SharedUsers, usuarioUnshare.Name)
+					//fmt.Println(gUsers[u.Name].Directorio.Ficheros[nombreFichero].SharedUsers)
+					response(w, true, "Fichero descompartido con "+usuarioUnshare.Name, u.Token)
+					return
+				}
+			}
+		}
 	case "public":
 		u, ok := gUsers[req.Form.Get("user")] // ¿existe ya el usuario?
 
@@ -605,7 +743,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
 			contenidoNota = contenidoNota[:len(contenidoNota)-2]
 			fmt.Println("contenido de la nota: " + contenidoNota)
 			usuario := ruta[1:]
-			fichero, ok := gUsers[u.Name].Directorio.Ficheros[nombreFichero]
+			fichero, ok := gUsers[usuario].Directorio.Ficheros[nombreFichero]
 			if !ok {
 				response(w, false, "El fichero no existe", u.Token)
 			}
@@ -615,11 +753,9 @@ func handler(w http.ResponseWriter, req *http.Request) {
 			}
 			if u.Name != usuario { // si el usuario que hace la peticion no es el autor del fichero
 				_, existe := fichero.SharedUsers[u.Name]
-				fmt.Print(existe)
-				fmt.Print(fichero.SharedUsers)
 				if fichero.Public || existe { // comprobamos que el usuario tiene permisos
 					fichero.Notas = append(fichero.Notas, nuevaNota)
-
+					gUsers[usuario].Directorio.Ficheros[nombreFichero] = fichero
 					response(w, true, "Nota añadida correctamente", u.Token)
 				} else {
 					response(w, false, "El usuario no tiene permisos", u.Token)
@@ -627,7 +763,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
 				return
 			}
 			fichero.Notas = append(fichero.Notas, nuevaNota)
-			gUsers[u.Name].Directorio.Ficheros[nombreFichero] = fichero
+			gUsers[usuario].Directorio.Ficheros[nombreFichero] = fichero
 			response(w, true, "Nota añadida correctamente", u.Token)
 			return
 		}

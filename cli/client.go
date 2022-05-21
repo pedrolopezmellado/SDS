@@ -18,6 +18,7 @@ import (
 	"os"
 	"sdspractica/srv"
 	"sdspractica/util"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -32,11 +33,17 @@ type nota struct {
 }
 
 type fichero struct {
-	Nombre      string
-	Contenido   string
-	Public      bool
-	SharedUsers map[string]user
-	Notas       []nota
+	Nombre        string
+	Contenido     string
+	Autor         string
+	Public        bool
+	SharedUsers   map[string]user
+	Notas         []nota
+	NumCaracteres int
+	Extension     string
+	NumRevisiones int
+	FechaCreacion time.Time
+	Version       int
 }
 
 type user struct {
@@ -132,7 +139,6 @@ func login(client *http.Client) {
 }
 
 func menuLogin() {
-
 	cadena := ""
 	exit = false
 
@@ -231,6 +237,21 @@ func shareComando(nombreFichero string, usuario string, client *http.Client) {
 	r.Body.Close() // hay que cerrar el reader del body
 }
 
+func unshareComando(nombreFichero string, usuario string, client *http.Client) {
+	data := url.Values{}
+	data.Set("cmd", "unshare")      // comando (string)
+	data.Set("user", usuarioActual) // usuario (string)
+	data.Set("nombreFichero", nombreFichero)
+	data.Set("userUnshare", usuario)
+
+	r, err := client.PostForm("https://localhost:10443", data) // enviamos por POST
+	chk(err)
+	resp := srv.Resp{}
+	json.NewDecoder(r.Body).Decode(&resp) // decodificamos la respuesta para utilizar sus campos más adelante
+	fmt.Println(resp.Msg)
+	r.Body.Close() // hay que cerrar el reader del body
+}
+
 func publicComando(nombreFichero string, client *http.Client) {
 	data := url.Values{}
 	data.Set("cmd", "public")       // comando (string)
@@ -275,19 +296,8 @@ func catComando(nombreFichero string, client *http.Client) {
 	json.Unmarshal([]byte(resp.Msg), &fichero)
 	if resp.Ok {
 		//Mostramos el contenido del fichero
-		fmt.Println("\nNombre: " + fichero.Nombre)
-		fmt.Println(fichero.Contenido + "\n")
-
-		if len(fichero.Notas) > 0 {
-			fmt.Println("------------------------------------------------------------")
-			fmt.Print("Notas\n\n")
-			for i := 0; i < len(fichero.Notas); i++ {
-				fmt.Println("Autor: " + fichero.Notas[i].Usuario)
-				fmt.Println(fichero.Notas[i].Contenido + "\n")
-				fmt.Println("------------------------------------------------------------")
-			}
-		}
-
+		fmt.Println("Nombre: " + fichero.Nombre)
+		fmt.Println(fichero.Contenido)
 	} else {
 		fmt.Println(resp.Msg)
 	}
@@ -308,6 +318,54 @@ func deleteComando(nombreFichero string, client *http.Client) {
 	//fmt.Println(resp)                     // imprimimos por pantalla
 	if resp.Ok {
 		fmt.Println(resp.Msg)
+	} else {
+		fmt.Println(resp.Msg)
+	}
+	r.Body.Close() // hay que cerrar el reader del body
+}
+
+func detailsComando(nombreFichero string, client *http.Client) {
+	data := url.Values{}                     // estructura para contener los valores
+	data.Set("cmd", "details")               // comando (string)
+	data.Set("user", usuarioActual)          // usuario (string)
+	data.Set("nombreFichero", nombreFichero) // nombre del fichero (string)
+	data.Set("ruta", ruta)                   // ruta (string)
+
+	r, err := client.PostForm("https://localhost:10443", data) // enviamos por POST
+	chk(err)
+	resp := srv.Resp{}
+	json.NewDecoder(r.Body).Decode(&resp) // decodificamos la respuesta para utilizar sus campos más adelante
+	//fmt.Println(resp)                     // imprimimos por pantalla
+	var fichero fichero
+	json.Unmarshal([]byte(resp.Msg), &fichero)
+	if resp.Ok {
+		//Mostramos el contenido del fichero
+		fmt.Println("Nombre: " + strings.Split(fichero.Nombre, "/")[0])
+		fmt.Println("Contenido: " + fichero.Contenido)
+		fmt.Println("Autor: " + fichero.Autor)
+		fmt.Println("Public: " + strconv.FormatBool(fichero.Public))
+		if len(fichero.SharedUsers) > 0 {
+			fmt.Println("------------------------------------------------------------")
+			fmt.Print("Usuarios compartidos: ")
+			for key := range fichero.SharedUsers {
+				fmt.Print(key)
+			}
+			fmt.Println()
+		}
+		if len(fichero.Notas) > 0 {
+			fmt.Println("------------------------------------------------------------")
+			fmt.Print("Notas\n\n")
+			for i := 0; i < len(fichero.Notas); i++ {
+				fmt.Println("Autor: " + fichero.Notas[i].Usuario)
+				fmt.Println(fichero.Notas[i].Contenido + "\n")
+				fmt.Println("------------------------------------------------------------")
+			}
+		}
+		fmt.Println("Número de carácteres: " + strconv.Itoa(fichero.NumCaracteres))
+		fmt.Println("Formato: " + fichero.Extension)
+		fmt.Println("Número de revisiones: " + strconv.Itoa(fichero.NumRevisiones))
+		fmt.Println("Fecha de creación: " + fichero.FechaCreacion.Format("2006-01-02 15:04:05"))
+		fmt.Println("Versión: " + strconv.Itoa(fichero.Version))
 	} else {
 		fmt.Println(resp.Msg)
 	}
@@ -378,7 +436,6 @@ func accionComando(cadena string) {
 		} else {
 			lsComando(client)
 		}
-		break
 	case "cd":
 		if moreCommands {
 			directorio := trozos[1]
@@ -386,7 +443,6 @@ func accionComando(cadena string) {
 		} else {
 			ruta = "/"
 		}
-		break
 	case "touch":
 		if !moreCommands {
 			fmt.Println("Debes introducir el nombre del fichero como argumento")
@@ -398,7 +454,6 @@ func accionComando(cadena string) {
 				touchComando(nombreFichero, client)
 			}
 		}
-		break
 	case "cat":
 		if len(trozos) != 2 {
 			fmt.Println("Error al introducir argumentos")
@@ -406,7 +461,6 @@ func accionComando(cadena string) {
 			nombreFichero := trozos[1]
 			catComando(nombreFichero, client)
 		}
-		break
 	case "upload":
 		if len(trozos) != 2 {
 			fmt.Println("Error al introducir argumentos")
@@ -414,7 +468,6 @@ func accionComando(cadena string) {
 			nombreFichero := trozos[1]
 			uploadComando(nombreFichero, client)
 		}
-		break
 	case "delete":
 		if len(trozos) != 2 {
 			fmt.Println("Error al introducir argumentos")
@@ -422,7 +475,13 @@ func accionComando(cadena string) {
 			nombreFichero := trozos[1]
 			deleteComando(nombreFichero, client)
 		}
-		break
+	case "details":
+		if len(trozos) != 2 {
+			fmt.Println("Error al introducir argumentos")
+		} else {
+			nombreFichero := trozos[1]
+			detailsComando(nombreFichero, client)
+		}
 	case "share":
 		if !moreCommands {
 			fmt.Println("Debes introducir el nombre del fichero y del usuario a compartir")
@@ -435,7 +494,18 @@ func accionComando(cadena string) {
 				shareComando(nombreFichero, usuario, client)
 			}
 		}
-		break
+	case "unshare":
+		if !moreCommands {
+			fmt.Println("Debes introducir el nombre del fichero y del usuario a compartir")
+		} else {
+			if len(trozos) == 2 || len(trozos) > 3 {
+				fmt.Println("Debes introducir el nombre del fichero y del usuario a compartir únicamente")
+			} else if len(trozos) == 3 {
+				nombreFichero := trozos[1]
+				usuario := trozos[2]
+				unshareComando(nombreFichero, usuario, client)
+			}
+		}
 	case "public":
 		if !moreCommands {
 			fmt.Println("Debes introducir el nombre del fichero como argumento")
@@ -447,7 +517,6 @@ func accionComando(cadena string) {
 				publicComando(nombreFichero, client)
 			}
 		}
-		break
 	case "private":
 		if !moreCommands {
 			fmt.Println("Debes introducir el nombre del fichero como argumento")
@@ -459,7 +528,6 @@ func accionComando(cadena string) {
 				privateComando(nombreFichero, client)
 			}
 		}
-		break
 	case "note":
 		if !moreCommands {
 			fmt.Println("Debes introducir el nombre del fichero como argumento")
@@ -471,13 +539,10 @@ func accionComando(cadena string) {
 				noteComando(nombreFichero, client)
 			}
 		}
-
 	case "exit":
 		exit = true
-		break
 	default:
 		fmt.Println("Error al introducir el comando")
-		break
 	}
 }
 
@@ -495,8 +560,10 @@ touch [nombre_fichero] 				Crea un fichero en la ruta
 cat [nombre_fichero] 				Muestra el contenido del fichero
 upload [nombre_fichero]				Sube un fichero de la carpeta ficheros
 edit [nombre_fichero]				Edita un fichero de la carpeta ficheros
+details [nombre_fichero]			Muestra los detalles(metadatos) del fichero
 delete [nombre_fichero]				Elimina un fichero
 share [nombre_fichero] [nombre_usuario]		Comparte el fichero con otro usuario
+unshare [nombre_fichero] [nombre_usuario]	Descomparte el fichero con otro usuario
 public [nombre_fichero]				Pone el fichero público para los demás usuarios
 private [nombre_fichero]			Pone el fichero privado
 note [nombre_fichero] 				Escribe una nota en el fichero
@@ -559,77 +626,10 @@ func Run() {
 		switch opcion {
 		case 1:
 			registro(pubJSON, pkJSON, client)
-			break
 		case 2:
 			login(client)
-			break
 		default:
 			fmt.Println("Hasta luego!!")
-			break
 		}
 	}
-
-	/*
-
-		// ** ejemplo de registro
-		data := url.Values{}                      // estructura para contener los valores
-		data.Set("cmd", "register")               // comando (string)
-		data.Set("user", "usuario")               // usuario (string)
-		data.Set("pass", util.Encode64(keyLogin)) // "contraseña" a base64
-
-		// comprimimos y codificamos la clave pública
-		data.Set("pubkey", util.Encode64(util.Compress(pubJSON)))
-
-		// comprimimos, ciframos y codificamos la clave privada
-		data.Set("prikey", util.Encode64(util.Encrypt(util.Compress(pkJSON), keyData)))
-
-		r, err := client.PostForm("https://localhost:10443", data) // enviamos por POST
-		chk(err)
-		io.Copy(os.Stdout, r.Body) // mostramos el cuerpo de la respuesta (es un reader)
-		r.Body.Close()             // hay que cerrar el reader del body
-		fmt.Println()
-
-		// ** ejemplo de login
-		data = url.Values{}
-		data.Set("cmd", "login")                                  // comando (string)
-		data.Set("user", "usuario")                               // usuario (string)
-		data.Set("pass", util.Encode64(keyLogin))                 // contraseña (a base64 porque es []byte)
-		r, err = client.PostForm("https://localhost:10443", data) // enviamos por POST
-		chk(err)
-		resp := srv.Resp{}
-		json.NewDecoder(r.Body).Decode(&resp) // decodificamos la respuesta para utilizar sus campos más adelante
-		fmt.Println(resp)                     // imprimimos por pantalla
-		r.Body.Close()                        // hay que cerrar el reader del body
-
-		// ** ejemplo de data sin utilizar el token correcto
-		badToken := make([]byte, 16)
-		_, err = rand.Read(badToken)
-		chk(err)
-
-		data = url.Values{}
-		data.Set("cmd", "data")                    // comando (string)
-		data.Set("user", "usuario")                // usuario (string)
-		data.Set("pass", util.Encode64(keyLogin))  // contraseña (a base64 porque es []byte)
-		data.Set("token", util.Encode64(badToken)) // token incorrecto
-		r, err = client.PostForm("https://localhost:10443", data)
-		chk(err)
-		io.Copy(os.Stdout, r.Body) // mostramos el cuerpo de la respuesta (es un reader)
-		r.Body.Close()             // hay que cerrar el reader del body
-		fmt.Println()
-
-		// ** ejemplo de data con token correcto
-
-		data = url.Values{}
-		data.Set("cmd", "data")                      // comando (string)
-		data.Set("user", "usuario")                  // usuario (string)
-		data.Set("pass", util.Encode64(keyLogin))    // contraseña (a base64 porque es []byte)
-		data.Set("token", util.Encode64(resp.Token)) // token correcto
-		r, err = client.PostForm("https://localhost:10443", data)
-		chk(err)
-		io.Copy(os.Stdout, r.Body) // mostramos el cuerpo de la respuesta (es un reader)
-		r.Body.Close()             // hay que cerrar el reader del body
-		fmt.Println()
-
-	*/
-
 }
