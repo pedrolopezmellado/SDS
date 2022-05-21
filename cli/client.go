@@ -11,7 +11,6 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -99,9 +98,8 @@ func registro(pubJSON []byte, pkJSON []byte, client *http.Client) {
 
 	r, err := client.PostForm("https://localhost:10443", data) // enviamos por POST
 	chk(err)
-	io.Copy(os.Stdout, r.Body) // mostramos el cuerpo de la respuesta (es un reader)
-	r.Body.Close()             // hay que cerrar el reader del body
-	fmt.Println()
+	fmt.Println("El usuario se ha registrado correctamente")
+	r.Body.Close() // hay que cerrar el reader del body
 }
 
 func login(client *http.Client) {
@@ -129,11 +127,12 @@ func login(client *http.Client) {
 	chk(err)
 	resp := srv.Resp{}
 	json.NewDecoder(r.Body).Decode(&resp) // decodificamos la respuesta para utilizar sus campos más adelante
-	fmt.Println(resp)                     // imprimimos por pantalla
 	if resp.Ok {
 		usuarioActual = usuario
 		ruta = "/" + usuarioActual
 		menuLogin()
+	} else {
+		fmt.Println("Credenciales inválidas")
 	}
 	r.Body.Close() // hay que cerrar el reader del body
 }
@@ -191,12 +190,8 @@ func uploadComando(nombreFichero string, client *http.Client) {
 		chk(err)
 		resp := srv.Resp{}
 		json.NewDecoder(r.Body).Decode(&resp) // decodificamos la respuesta para utilizar sus campos más adelante
-		//fmt.Println(resp)                     // imprimimos por pantalla
 		fmt.Println(resp.Msg)
 		r.Body.Close() // hay que cerrar el reader del body
-
-		// imprimir el string
-		//fmt.Println(datosComoString)
 	}
 }
 
@@ -291,11 +286,9 @@ func catComando(nombreFichero string, client *http.Client) {
 	chk(err)
 	resp := srv.Resp{}
 	json.NewDecoder(r.Body).Decode(&resp) // decodificamos la respuesta para utilizar sus campos más adelante
-	//fmt.Println(resp)                     // imprimimos por pantalla
 	var fichero fichero
 	json.Unmarshal([]byte(resp.Msg), &fichero)
-	if resp.Ok {
-		//Mostramos el contenido del fichero
+	if resp.Ok { // Mostramos el contenido del fichero
 		fmt.Println("Nombre: " + fichero.Nombre)
 		fmt.Println(fichero.Contenido)
 	} else {
@@ -305,7 +298,7 @@ func catComando(nombreFichero string, client *http.Client) {
 }
 
 func deleteComando(nombreFichero string, client *http.Client) {
-	// ** ejemplo de registro
+
 	data := url.Values{}                     // estructura para contener los valores
 	data.Set("cmd", "delete")                // comando (string)
 	data.Set("user", usuarioActual)          // usuario (string)
@@ -325,6 +318,7 @@ func deleteComando(nombreFichero string, client *http.Client) {
 }
 
 func detailsComando(nombreFichero string, client *http.Client) {
+
 	data := url.Values{}                     // estructura para contener los valores
 	data.Set("cmd", "details")               // comando (string)
 	data.Set("user", usuarioActual)          // usuario (string)
@@ -335,11 +329,10 @@ func detailsComando(nombreFichero string, client *http.Client) {
 	chk(err)
 	resp := srv.Resp{}
 	json.NewDecoder(r.Body).Decode(&resp) // decodificamos la respuesta para utilizar sus campos más adelante
-	//fmt.Println(resp)                     // imprimimos por pantalla
 	var fichero fichero
 	json.Unmarshal([]byte(resp.Msg), &fichero)
-	if resp.Ok {
-		//Mostramos el contenido del fichero
+
+	if resp.Ok { // Mostramos el contenido del fichero
 		fmt.Println("Nombre: " + strings.Split(fichero.Nombre, "/")[0])
 		fmt.Println("Contenido: " + fichero.Contenido)
 		fmt.Println("Autor: " + fichero.Autor)
@@ -373,6 +366,7 @@ func detailsComando(nombreFichero string, client *http.Client) {
 }
 
 func cdComando(directorio string, client *http.Client) {
+
 	data := url.Values{}               // estructura para contener los valores
 	data.Set("cmd", "cd")              // comando (string)
 	data.Set("user", usuarioActual)    // usuario (string)
@@ -392,6 +386,7 @@ func cdComando(directorio string, client *http.Client) {
 }
 
 func noteComando(nombreFichero string, client *http.Client) {
+
 	data := url.Values{}                     // estructura para contener los valores
 	data.Set("cmd", "note")                  // comando (string)
 	data.Set("user", usuarioActual)          // usuario (string)
@@ -410,6 +405,7 @@ func noteComando(nombreFichero string, client *http.Client) {
 }
 
 func accionComando(cadena string) {
+
 	var moreCommands = true
 	trozos := strings.Split(cadena, " ")
 	comando := trozos[0]
@@ -425,18 +421,21 @@ func accionComando(cadena string) {
 
 	switch comando {
 	case "help":
+
 		if moreCommands {
 			fmt.Println("Este comando no acepta argumentos")
 		} else {
 			helpComando()
 		}
 	case "ls":
+
 		if moreCommands {
 			fmt.Println("Este comando no acepta argumentos")
 		} else {
 			lsComando(client)
 		}
 	case "cd":
+
 		if moreCommands {
 			directorio := trozos[1]
 			cdComando(directorio, client)
@@ -444,6 +443,7 @@ func accionComando(cadena string) {
 			ruta = "/"
 		}
 	case "touch":
+
 		if !moreCommands {
 			fmt.Println("Debes introducir el nombre del fichero como argumento")
 		} else {
@@ -455,6 +455,7 @@ func accionComando(cadena string) {
 			}
 		}
 	case "cat":
+
 		if len(trozos) != 2 {
 			fmt.Println("Error al introducir argumentos")
 		} else {
@@ -462,6 +463,7 @@ func accionComando(cadena string) {
 			catComando(nombreFichero, client)
 		}
 	case "upload":
+
 		if len(trozos) != 2 {
 			fmt.Println("Error al introducir argumentos")
 		} else {
@@ -469,6 +471,7 @@ func accionComando(cadena string) {
 			uploadComando(nombreFichero, client)
 		}
 	case "delete":
+
 		if len(trozos) != 2 {
 			fmt.Println("Error al introducir argumentos")
 		} else {
@@ -476,6 +479,7 @@ func accionComando(cadena string) {
 			deleteComando(nombreFichero, client)
 		}
 	case "details":
+
 		if len(trozos) != 2 {
 			fmt.Println("Error al introducir argumentos")
 		} else {
@@ -483,6 +487,7 @@ func accionComando(cadena string) {
 			detailsComando(nombreFichero, client)
 		}
 	case "share":
+
 		if !moreCommands {
 			fmt.Println("Debes introducir el nombre del fichero y del usuario a compartir")
 		} else {
@@ -495,6 +500,7 @@ func accionComando(cadena string) {
 			}
 		}
 	case "unshare":
+
 		if !moreCommands {
 			fmt.Println("Debes introducir el nombre del fichero y del usuario a compartir")
 		} else {
@@ -507,6 +513,7 @@ func accionComando(cadena string) {
 			}
 		}
 	case "public":
+
 		if !moreCommands {
 			fmt.Println("Debes introducir el nombre del fichero como argumento")
 		} else {
@@ -518,6 +525,7 @@ func accionComando(cadena string) {
 			}
 		}
 	case "private":
+
 		if !moreCommands {
 			fmt.Println("Debes introducir el nombre del fichero como argumento")
 		} else {
@@ -529,6 +537,7 @@ func accionComando(cadena string) {
 			}
 		}
 	case "note":
+
 		if !moreCommands {
 			fmt.Println("Debes introducir el nombre del fichero como argumento")
 		} else {
@@ -548,7 +557,6 @@ func accionComando(cadena string) {
 
 func helpComando() {
 
-	// NO CAMBIAR -- SE MUESTRAN BIEN
 	comandosHelp :=
 		`
 *** Comandos ***
@@ -602,13 +610,6 @@ func Run() {
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		}
 		client := &http.Client{Transport: tr}
-
-		// hash con SHA512 de la contraseña
-		/*
-			keyClient := sha512.Sum512([]byte("contraseña del cliente"))
-			keyLogin := keyClient[:32]  // una mitad para el login (256 bits)
-			keyData := keyClient[32:64] // la otra para los datos (256 bits)
-		*/
 
 		// generamos un par de claves (privada, pública) para el servidor
 		pkClient, err := rsa.GenerateKey(rand.Reader, 1024)

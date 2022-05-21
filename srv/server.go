@@ -6,7 +6,6 @@ Servidor
 package srv
 
 import (
-	"bytes"
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
@@ -50,16 +49,6 @@ type fichero struct {
 	Version       int
 }
 
-type ficheroCompartido struct {
-	Nombre            string
-	UsuarioDestino    user
-	UsuarioOrigen     user
-	FicheroEncriptado []byte
-	FicheroHasheado   []byte
-	RandomKey         []byte
-	Firma             []byte
-}
-
 type directorio struct {
 	Nombre   string
 	Ficheros map[string]fichero
@@ -89,15 +78,13 @@ var config = &PasswordConfig{
 	keyLen:  32,
 }
 
-//maximo de versiones que puede tener un fichero
+// maximo de versiones que puede tener un fichero
 const maxVersion int = 5
 
 // mapa con todos los usuarios
-// (se podría serializar con JSON o Gob, etc. y escribir/leer de disco para persistencia)
 var gUsers map[string]user
 
-// mapa donde almacenamos las copias de los ficheros compartidos entre usuarios
-var ficherosCompartidos map[string]ficheroCompartido
+// clave que cifra contenido en disco
 var keyServidor []byte
 
 // chk comprueba y sale si hay errores (ahorra escritura en programas sencillos)
@@ -136,7 +123,6 @@ func existeFichero(nombreFichero string, ficheros map[string]fichero) (fichero, 
 	var existe bool
 	for i := maxVersion; i >= 1; i-- {
 		key := nombreFichero + "/v" + strconv.Itoa(i)
-		fmt.Println(key)
 		if ficheroResultado, existe := ficheros[key]; existe {
 			return ficheroResultado, existe
 		}
@@ -162,12 +148,9 @@ func leerEnDisco() {
 		dataUsuarios = util.Decompress(dataUsuarios)
 		err = json.Unmarshal([]byte(dataUsuarios), &gUsers)
 	}
-
-	//fmt.Println(gUsers)
 }
 
 func guardarEnDisco() {
-
 	datosUsuarios, err := json.Marshal(gUsers)
 	chk(err)
 	datosKey, err := json.Marshal(keyServidor)
@@ -178,8 +161,6 @@ func guardarEnDisco() {
 
 	err = ioutil.WriteFile("disco.txt", datosUsuarios, 0644)
 	err = ioutil.WriteFile("keyServidor.txt", datosKey, 0644)
-
-	//defer file.Close()
 }
 
 func generatePassword(password []byte, salt *[]byte) []byte {
@@ -204,37 +185,31 @@ func comparePassword(password []byte, hash []byte) bool {
 	hashString := string(hash)
 	trozos := strings.Split(hashString, "$")
 	c := &PasswordConfig{}
-
 	_, err := fmt.Sscanf(trozos[3], "m=%d,t=%d,p=%d", &c.memory, &c.time, &c.threads)
 	if err != nil {
 		return false
 	}
-
 	salt, err := base64.RawStdEncoding.DecodeString(trozos[4])
 	if err != nil {
 		return false
 	}
-
 	decodedHash, err := base64.RawStdEncoding.DecodeString(trozos[5])
 	if err != nil {
 		return false
 	}
 	c.keyLen = uint32(len(decodedHash))
-
 	comparisonHash := argon2.IDKey(password, salt, c.time, c.memory, c.threads, c.keyLen)
-
 	return (subtle.ConstantTimeCompare(decodedHash, comparisonHash) == 1)
 }
 
-// gestiona el modo servidor
 func Run() {
+
 	loadEnv()
 	clave := util.Decode64(os.Getenv("CLAVE")) // accedemos a la variable de entorno CLAVE
 	if keyServidor == nil {
 		salt := make([]byte, 16) // sal (16 bytes == 128 bits)
 		rand.Read(salt)          // la sal es aleatoria
 		keyServidor = argon2.IDKey(clave, salt, config.time, config.memory, config.threads, config.keyLen)
-		//keyServidor = generatePassword(clave, &salt) //hasheado con argon2
 	}
 
 	leerEnDisco() //leemos la info de la app de disco.txt
@@ -259,14 +234,11 @@ func handler(w http.ResponseWriter, req *http.Request) {
 
 	switch req.Form.Get("cmd") { // comprobamos comando desde el cliente
 	case "register": // ** registro
-
-		fmt.Println("Usuarios antes de hacer el registro: " + strconv.Itoa(len(gUsers)))
 		_, ok := gUsers[req.Form.Get("user")] // ¿existe ya el usuario?
 		if ok {
 			response(w, false, "Usuario ya registrado", nil)
 			return
 		}
-
 		u := user{}
 		u.Name = req.Form.Get("user") // nombre
 		u.Directorio.Nombre = u.Name
@@ -288,10 +260,10 @@ func handler(w http.ResponseWriter, req *http.Request) {
 			gUsers = make(map[string]user)
 		}
 		gUsers[u.Name] = u
-		fmt.Println("Usuarios despues de hacer el registro: " + strconv.Itoa(len(gUsers)))
 		response(w, true, "Usuario registrado", u.Token)
 
-	case "login": // ** login
+	case "login":
+
 		u, ok := gUsers[req.Form.Get("user")] // ¿existe ya el usuario?
 		if !ok {
 			response(w, false, "Usuario inexistente", nil)
@@ -309,12 +281,12 @@ func handler(w http.ResponseWriter, req *http.Request) {
 			response(w, true, "Credenciales válidas", u.Token)
 		}
 	case "upload":
+
 		u, ok := gUsers[req.Form.Get("user")] // ¿existe ya el usuario?
 		if !ok {
 			response(w, false, "Usuario inexistente", nil)
 			return
 		}
-
 		ruta := req.Form.Get("ruta")
 		usuario := ruta[1:]
 		if u.Name != usuario {
@@ -326,7 +298,6 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		nombreFichero := req.Form.Get("nombreFichero")
 
 		ficheroActual, okFichero := existeFichero(nombreFichero, gUsers[u.Name].Directorio.Ficheros)
-		fmt.Println(ficheroActual)
 		ext := obtenerExtension(nombreFichero)
 
 		if ext == "error" {
@@ -335,7 +306,10 @@ func handler(w http.ResponseWriter, req *http.Request) {
 			var version int
 			if okFichero {
 				version = ficheroActual.Version + 1
-				fmt.Println(version)
+				if version > maxVersion {
+					response(w, false, "Has alcanzado el número máximo de versiones para el fichero", u.Token)
+					return
+				}
 				nombreFichero = nombreFichero + "/v" + strconv.Itoa(version)
 			} else {
 				version = 1
@@ -357,6 +331,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
 			response(w, true, mensaje, u.Token)
 		}
 	case "cat":
+
 		u, ok := gUsers[req.Form.Get("user")] // ¿existe ya el usuario?
 		if !ok {
 			response(w, false, "Usuario inexistente", nil)
@@ -390,6 +365,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		response(w, true, string(datos), u.Token)
 
 	case "delete":
+
 		u, ok := gUsers[req.Form.Get("user")] // ¿existe ya el usuario?
 		if !ok {
 			response(w, false, "Usuario inexistente", nil)
@@ -405,6 +381,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		delete(gUsers[u.Name].Directorio.Ficheros, fichero.Nombre)
 		response(w, true, "Fichero eliminado correctamente", u.Token)
 	case "details":
+
 		u, ok := gUsers[req.Form.Get("user")] // ¿existe ya el usuario?
 		if !ok {
 			response(w, false, "Usuario inexistente", nil)
@@ -432,31 +409,8 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		datos, err := json.Marshal(&fichero) //
 		chk(err)
 		response(w, true, string(datos), u.Token)
-	case "data": // ** obtener datos de usuario
-		u, ok := gUsers[req.Form.Get("user")] // ¿existe ya el usuario?
-		if !ok {
-			response(w, false, "No autentificado", nil)
-			return
-		} else if (u.Token == nil) || (time.Since(u.Seen).Minutes() > 60) {
-			// sin token o con token expirado
-			response(w, false, "No autentificado", nil)
-			return
-		} else if !bytes.EqualFold(u.Token, util.Decode64(req.Form.Get("token"))) {
-			// token no coincide
-			response(w, false, "No autentificado", nil)
-			return
-		}
-
-		datos, err := json.Marshal(&u.Data) //
-		chk(err)
-		u.Seen = time.Now()
-		gUsers[u.Name] = u
-		response(w, true, string(datos), u.Token)
 	case "ls":
-		//casos:
-		//mostrar los directorios de todos los usuarios si estas en el directorio raiz
-		//si estas en el directorio de otro usuario mostrar sus ficheros y publicos y los compartidos contigo
-		//si estas en tu propio directorio mostrar todo su contenido
+
 		u, ok := gUsers[req.Form.Get("user")] // ¿existe ya el usuario?
 		if !ok {
 			response(w, false, "No autentificado", nil)
@@ -500,6 +454,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
 			}
 		}
 	case "touch":
+
 		u, ok := gUsers[req.Form.Get("user")] // ¿existe ya el usuario?
 		if !ok {
 			response(w, false, "No autentificado", nil)
@@ -512,9 +467,9 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		contenido := req.Form.Get("contenido")
 		ruta := req.Form.Get("ruta")
 		usuario := ruta[1:]
-		fmt.Print(usuario)
 		if u.Name != usuario {
 			response(w, false, "No tienes permisos para crear un fichero en este directorio", u.Token)
+			return
 		} else {
 			nombreFichero := req.Form.Get("nombreFichero")
 			nombreFichero = nombreFichero[:len(nombreFichero)-2]
@@ -522,20 +477,17 @@ func handler(w http.ResponseWriter, req *http.Request) {
 
 			if ext == "error" {
 				response(w, false, "El nombre del fichero debe seguir el formato <nombre>.<extension>", u.Token)
+				return
 			} else {
 				var version int
 				ficheroExistente, existeFichero := existeFichero(nombreFichero, gUsers[u.Name].Directorio.Ficheros)
-				fmt.Println(ficheroExistente)
 				if existeFichero {
-					fmt.Print("estot: ")
-					fmt.Println(ficheroExistente.Version)
 					version = ficheroExistente.Version + 1
 					if version > maxVersion {
 						response(w, false, "Has alcanzado el número máximo de versiones para el fichero", u.Token)
 						return
 					}
 					nombreFichero = nombreFichero + "/v" + strconv.Itoa(version)
-					fmt.Println(nombreFichero)
 				} else {
 					version = 1
 					nombreFichero = nombreFichero + "/v1"
@@ -553,9 +505,11 @@ func handler(w http.ResponseWriter, req *http.Request) {
 				}
 				gUsers[u.Name].Directorio.Ficheros[miFichero.Nombre] = miFichero
 				response(w, true, "Fichero creado", u.Token)
+				return
 			}
 		}
 	case "cd":
+
 		u, ok := gUsers[req.Form.Get("user")] // ¿existe ya el usuario?
 		if !ok {
 			response(w, false, "No autentificado", nil)
@@ -567,7 +521,6 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		} else {
 			directorio := req.Form.Get("directorio")
 			directorio = directorio[:len(directorio)-2]
-			fmt.Print(directorio)
 			var nombreDir string
 			existe := false
 			for nombre := range gUsers {
@@ -583,6 +536,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
 			}
 		}
 	case "share":
+
 		u, ok := gUsers[req.Form.Get("user")] // ¿existe ya el usuario?
 		if !ok {
 			response(w, false, "No autentificado", nil)
@@ -611,41 +565,14 @@ func handler(w http.ResponseWriter, req *http.Request) {
 					response(w, false, "El usuario al que desea compartir su fichero no existe", u.Token)
 					return
 				} else {
-					//Realizamos RSA con firma digital
-					/*key := make([]byte, 32) // clave aleatoria de cifrado (AES)
-					rand.Read(key)
-					ficheroJson, err := json.Marshal(ficheroUsuario)
-					chk(err)
-					ficheroEncriptado := util.Encrypt(util.Compress([]byte(ficheroJson)), key) // encriptamos fichero con clave aleatoria
-					fmt.Println(ficheroEncriptado)
-					keyPubDestino, err := x509.ParsePKCS1PublicKey([]byte(usuarioShare.Data["public"])) // parseamos la clave publica del usuario destino
-					chk(err)
-					keyCifrada, err := rsa.EncryptOAEP(sha256.New(), rand.Reader, keyPubDestino, key, nil) // encriptamos clave con clave publica del usuario destino
-					chk(err)
-					ficheroHasheado := hash([]byte(ficheroJson))
-					keyPrivOrigen, err := x509.ParsePKCS1PrivateKey([]byte(u.Data["private"])) // parseamos la clave privada del usuario origen
-					chk(err)
-					firma, err := rsa.SignPSS(rand.Reader, keyPrivOrigen, crypto.SHA256, ficheroHasheado, nil)
-					chk(err)
-					ficheroCompartido := ficheroCompartido{
-						Nombre:            ficheroUsuario.Nombre,
-						UsuarioOrigen:     u,
-						UsuarioDestino:    usuarioShare,
-						FicheroEncriptado: ficheroEncriptado,
-						FicheroHasheado:   ficheroHasheado,
-						RandomKey:         keyCifrada,
-						Firma:             firma,
-					}
-					ficherosCompartidos[ficheroCompartido.Nombre] = ficheroCompartido*/
-
 					gUsers[u.Name].Directorio.Ficheros[nombreFichero].SharedUsers[usuarioShare.Name] = usuarioShare
-					//fmt.Println(gUsers[u.Name].Directorio.Ficheros[nombreFichero].SharedUsers)
 					response(w, true, "Fichero compartido con "+usuarioShare.Name, u.Token)
 					return
 				}
 			}
 		}
 	case "unshare":
+
 		u, ok := gUsers[req.Form.Get("user")] // ¿existe ya el usuario?
 		if !ok {
 			response(w, false, "No autentificado", nil)
@@ -675,15 +602,14 @@ func handler(w http.ResponseWriter, req *http.Request) {
 					return
 				} else {
 					delete(gUsers[u.Name].Directorio.Ficheros[nombreFichero].SharedUsers, usuarioUnshare.Name)
-					//fmt.Println(gUsers[u.Name].Directorio.Ficheros[nombreFichero].SharedUsers)
 					response(w, true, "Fichero descompartido con "+usuarioUnshare.Name, u.Token)
 					return
 				}
 			}
 		}
 	case "public":
-		u, ok := gUsers[req.Form.Get("user")] // ¿existe ya el usuario?
 
+		u, ok := gUsers[req.Form.Get("user")] // ¿existe ya el usuario?
 		if !ok {
 			response(w, false, "No autentificado", nil)
 			return
@@ -705,6 +631,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
 			response(w, true, "Ahora "+nombreFichero+" es público", u.Token)
 		}
 	case "private":
+
 		u, ok := gUsers[req.Form.Get("user")] // ¿existe ya el usuario?
 		if !ok {
 			response(w, false, "No autentificado", nil)
@@ -723,7 +650,6 @@ func handler(w http.ResponseWriter, req *http.Request) {
 			} else {
 				fichero.Public = false
 				gUsers[u.Name].Directorio.Ficheros[nombreFichero] = fichero
-				fmt.Println(gUsers[u.Name].Directorio.Ficheros)
 			}
 			response(w, true, "Ahora "+nombreFichero+" es privado", u.Token)
 		}
@@ -733,8 +659,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
 			response(w, false, "No autentificado", nil)
 			return
 		} else if (u.Token == nil) || (time.Since(u.Seen).Minutes() > 60) {
-			// sin token o con token expirado
-			response(w, false, "No autentificado", nil)
+			response(w, false, "No autentificado", nil) // sin token o con token expirado
 			return
 		} else {
 			nombreFichero := req.Form.Get("nombreFichero")
@@ -742,7 +667,6 @@ func handler(w http.ResponseWriter, req *http.Request) {
 			ruta := req.Form.Get("ruta")
 			contenidoNota := req.Form.Get("contenido")
 			contenidoNota = contenidoNota[:len(contenidoNota)-2]
-			fmt.Println("contenido de la nota: " + contenidoNota)
 			usuario := ruta[1:]
 			fichero, ok := gUsers[usuario].Directorio.Ficheros[nombreFichero]
 			if !ok {
@@ -771,7 +695,6 @@ func handler(w http.ResponseWriter, req *http.Request) {
 	default:
 		response(w, false, "Comando no implementado", nil)
 	}
-
 }
 
 // respuesta del servidor
@@ -783,24 +706,10 @@ type Resp struct {
 	Token []byte // token de sesión para utilizar por el cliente
 }
 
-type RespFichero struct {
-	Ok      bool   // true -> correcto, false -> error
-	Msg     string // mensaje adicional
-	Fichero fichero
-	Token   []byte // token de sesión para utilizar por el cliente
-}
-
 // función para escribir una respuesta del servidor
 func response(w io.Writer, ok bool, msg string, token []byte) {
 	r := Resp{Ok: ok, Msg: msg, Token: token} // formateamos respuesta
 	rJSON, err := json.Marshal(&r)            // codificamos en JSON
 	chk(err)                                  // comprobamos error
 	w.Write(rJSON)                            // escribimos el JSON resultante
-}
-
-func responseFichero(w io.Writer, ok bool, msg string, fichero fichero, token []byte) {
-	r := RespFichero{Ok: ok, Msg: msg, Fichero: fichero, Token: token} // formateamos respuesta
-	rJSON, err := json.Marshal(&r)                                     // codificamos en JSON
-	chk(err)                                                           // comprobamos error
-	w.Write(rJSON)                                                     // escribimos el JSON resultante
 }
