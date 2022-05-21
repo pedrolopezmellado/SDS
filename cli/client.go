@@ -112,7 +112,7 @@ func login(client *http.Client) {
 
 	fmt.Println("\n*** Login ***")
 	fmt.Print("Usuario: ")
-	fmt.Scanf("%s", &usuario)
+	fmt.Scanln(&usuario)
 	fmt.Print("Contraseña: ")
 	fmt.Scanln(&password)
 
