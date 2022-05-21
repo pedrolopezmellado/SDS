@@ -41,6 +41,7 @@ type fichero struct {
 	Contenido   string
 	Public      bool
 	SharedUsers map[string]user
+	Version     float32
 	Notas       []nota
 }
 
@@ -270,7 +271,6 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		if !comparePassword(password, u.Hash) { // comparamos
 			response(w, false, "Credenciales inválidas", nil)
 		} else {
-			u.Seen = time.Now()        // asignamos tiempo de login
 			u.Token = make([]byte, 16) // token (16 bytes == 128 bits)
 			rand.Read(u.Token)         // el token es aleatorio
 			gUsers[u.Name] = u
@@ -298,12 +298,13 @@ func handler(w http.ResponseWriter, req *http.Request) {
 			response(w, false, "El fichero "+ficheroActual.Nombre+" ya existe", u.Token)
 			return
 		}
-
+		nombreFichero = nombreFichero + "/1.0"
 		miFichero := fichero{
 			Nombre:      nombreFichero,
 			Contenido:   contenidoFichero,
 			Public:      false,
 			SharedUsers: make(map[string]user),
+			Version:     1.0,
 		}
 		gUsers[u.Name].Directorio.Ficheros[nombreFichero] = miFichero
 		mensaje := "Fichero subido correctamente"
@@ -345,6 +346,8 @@ func handler(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 		nombreFichero := req.Form.Get("nombreFichero")
+		nombreFichero = nombreFichero[:len(nombreFichero)-2]
+		fmt.Println(nombreFichero)
 		fichero, okFichero := gUsers[u.Name].Directorio.Ficheros[nombreFichero]
 		if !okFichero {
 			response(w, false, "El fichero no existe", u.Token)

@@ -100,12 +100,12 @@ func registro(pubJSON []byte, pkJSON []byte, client *http.Client) {
 func login(client *http.Client) {
 	// ** ejemplo de login
 
-	usuario := ""
+	usuario := "aa"
 	password := ""
 
 	fmt.Println("\n*** Login ***")
 	fmt.Print("Usuario: ")
-	fmt.Scanln(&usuario)
+	fmt.Scanf("%s", &usuario)
 	fmt.Print("Contraseña: ")
 	fmt.Scanln(&password)
 
@@ -494,6 +494,7 @@ cd [nombre_usuario]				Te lleva al directorio del usuario
 touch [nombre_fichero] 				Crea un fichero en la ruta
 cat [nombre_fichero] 				Muestra el contenido del fichero
 upload [nombre_fichero]				Sube un fichero de la carpeta ficheros
+edit [nombre_fichero]				Edita un fichero de la carpeta ficheros
 delete [nombre_fichero]				Elimina un fichero
 share [nombre_fichero] [nombre_usuario]		Comparte el fichero con otro usuario
 public [nombre_fichero]				Pone el fichero público para los demás usuarios
