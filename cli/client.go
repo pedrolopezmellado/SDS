@@ -211,7 +211,6 @@ func touchComando(nombreFichero string, client *http.Client) {
 	chk(err)
 	resp := srv.Resp{}
 	json.NewDecoder(r.Body).Decode(&resp) // decodificamos la respuesta para utilizar sus campos más adelante
-	fmt.Println(resp)                     // imprimimos por pantalla
 	fmt.Println(resp.Msg)
 
 	r.Body.Close() // hay que cerrar el reader del body

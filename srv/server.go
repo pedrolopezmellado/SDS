@@ -18,6 +18,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"regexp"
 	"sdspractica/util"
 	"strconv"
 	"strings"
@@ -110,8 +111,9 @@ func loadEnv() {
 
 func obtenerExtension(nombreFichero string) string {
 	trozos := strings.Split(nombreFichero, ".")
+	var IsLetter = regexp.MustCompile(`^[a-zA-Z]+$`).MatchString
 
-	if len(trozos) != 2 {
+	if len(trozos) != 2 || !IsLetter(trozos[1]) {
 		return "error"
 	}
 	return trozos[1]
@@ -457,18 +459,18 @@ func handler(w http.ResponseWriter, req *http.Request) {
 
 		u, ok := gUsers[req.Form.Get("user")] // ¿existe ya el usuario?
 		if !ok {
-			response(w, false, "No autentificado", nil)
+			response(w, false, "Error: No autentificado", nil)
 			return
 		} else if (u.Token == nil) || (time.Since(u.Seen).Minutes() > 60) {
 			// sin token o con token expirado
-			response(w, false, "No autentificado", nil)
+			response(w, false, "Error: No autentificado", nil)
 			return
 		}
 		contenido := req.Form.Get("contenido")
 		ruta := req.Form.Get("ruta")
 		usuario := ruta[1:]
 		if u.Name != usuario {
-			response(w, false, "No tienes permisos para crear un fichero en este directorio", u.Token)
+			response(w, false, "Error: No tienes permisos para crear un fichero en este directorio", u.Token)
 			return
 		} else {
 			nombreFichero := req.Form.Get("nombreFichero")
@@ -476,7 +478,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
 			ext := obtenerExtension(nombreFichero)
 
 			if ext == "error" {
-				response(w, false, "El nombre del fichero debe seguir el formato <nombre>.<extension>", u.Token)
+				response(w, false, "Error: El nombre del fichero debe seguir el formato <nombre>.<extension>", u.Token)
 				return
 			} else {
 				var version int
@@ -484,7 +486,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
 				if existeFichero {
 					version = ficheroExistente.Version + 1
 					if version > maxVersion {
-						response(w, false, "Has alcanzado el número máximo de versiones para el fichero", u.Token)
+						response(w, false, "Error: Has alcanzado el número máximo de versiones para el fichero", u.Token)
 						return
 					}
 					nombreFichero = nombreFichero + "/v" + strconv.Itoa(version)
