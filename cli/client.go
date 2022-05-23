@@ -170,18 +170,15 @@ func lsComando(client *http.Client) {
 }
 
 func uploadComando(nombreFichero string, client *http.Client) {
-	// ** ejemplo de registro
 	data := url.Values{}            // estructura para contener los valores
 	data.Set("cmd", "upload")       // comando (string)
 	data.Set("user", usuarioActual) // usuario (string)
-	//dir, err := os.Getwd()
-	//fmt.Println(dir)
+
 	nombreFichero = nombreFichero[:len(nombreFichero)-2]
 	file, err := ioutil.ReadFile("./ficheros/" + nombreFichero)
 	if err != nil {
 		fmt.Println(err)
 	} else {
-		//fmt.Println(string(file))
 		data.Set("ruta", ruta)
 		data.Set("contenidoFichero", string(file)) // usuario (string)
 		data.Set("nombreFichero", nombreFichero)
@@ -275,7 +272,6 @@ func privateComando(nombreFichero string, client *http.Client) {
 }
 
 func catComando(nombreFichero string, client *http.Client) {
-	// ** ejemplo de registro
 	data := url.Values{}                                       // estructura para contener los valores
 	data.Set("cmd", "cat")                                     // comando (string)
 	data.Set("user", usuarioActual)                            // usuario (string)
