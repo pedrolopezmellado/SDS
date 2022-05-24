@@ -9,6 +9,7 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
 	"io"
 )
@@ -18,6 +19,12 @@ func chk(e error) {
 	if e != nil {
 		panic(e)
 	}
+}
+
+func Hash(data []byte) []byte {
+	h := sha256.New() // creamos un nuevo hash (SHA2-256)
+	h.Write(data)     // procesamos los datos
+	return h.Sum(nil) // obtenemos el resumen
 }
 
 // función para cifrar (AES-CTR 256), adjunta el IV al principio
