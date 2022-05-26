@@ -76,7 +76,6 @@ var config = &PasswordConfig{
 	keyLen:  32,
 }
 
-// chk comprueba y sale si hay errores (ahorra escritura en programas sencillos)
 func chk(e error) {
 	if e != nil {
 		panic(e)
@@ -94,17 +93,15 @@ func registro(pubJSON []byte, pkJSON []byte, client *http.Client) {
 	fmt.Print("Contraseña: ")
 	fmt.Scanln(&password)
 
-	// ** ejemplo de registro
-	data := url.Values{}        // estructura para contener los valores
-	data.Set("cmd", "register") // comando (string)
-	data.Set("user", usuario)   // usuario (string)
+	data := url.Values{}
+	data.Set("cmd", "register")
+	data.Set("user", usuario)
 
-	// hash con SHA512 de la contraseña
 	keyClient := sha512.Sum512([]byte(password))
 	keyLogin := keyClient[:32]  // una mitad para el login (256 bits)
 	keyData := keyClient[32:64] // la otra para los datos (256 bits)
 
-	data.Set("pass", util.Encode64(keyLogin)) // "contraseña" a base64
+	data.Set("pass", util.Encode64(keyLogin))
 
 	// comprimimos y codificamos la clave pública
 	data.Set("pubkey", util.Encode64(util.Compress(pubJSON)))
@@ -112,15 +109,13 @@ func registro(pubJSON []byte, pkJSON []byte, client *http.Client) {
 	// comprimimos, ciframos y codificamos la clave privada
 	data.Set("prikey", util.Encode64(util.Encrypt(util.Compress(pkJSON), keyData)))
 
-	r, err := client.PostForm("https://localhost:10443", data) // enviamos por POST
+	r, err := client.PostForm("https://localhost:10443", data)
 	chk(err)
 	fmt.Println("El usuario se ha registrado correctamente")
-	r.Body.Close() // hay que cerrar el reader del body
+	r.Body.Close()
 }
 
 func login(client *http.Client) {
-	// ** ejemplo de login
-
 	usuario := ""
 	password := ""
 
@@ -150,7 +145,7 @@ func login(client *http.Client) {
 	} else {
 		fmt.Println("Credenciales inválidas")
 	}
-	r.Body.Close() // hay que cerrar el reader del body
+	r.Body.Close()
 }
 
 func menuLogin() {
@@ -170,30 +165,29 @@ func menuLogin() {
 
 func lsComando(client *http.Client) {
 	data := url.Values{}
-	data.Set("cmd", "ls")           // comando (string)
-	data.Set("user", usuarioActual) // usuario (string)
+	data.Set("cmd", "ls")
+	data.Set("user", usuarioActual)
 	data.Set("ruta", ruta)
 
-	r, err := client.PostForm("https://localhost:10443", data) // enviamos por POST
+	r, err := client.PostForm("https://localhost:10443", data)
 	chk(err)
 	resp := srv.Resp{}
 	json.NewDecoder(r.Body).Decode(&resp) // decodificamos la respuesta para utilizar sus campos más adelante
-	//fmt.Println(resp)                     // imprimimos por pantalla
 	if resp.Ok {
 		fmt.Println(resp.Msg)
 	}
-	r.Body.Close() // hay que cerrar el reader del body
+	r.Body.Close()
 }
 
 func obtenerUsuario(client *http.Client) user {
 	data := url.Values{}
-	data.Set("cmd", "obtenerUsuario") // comando (string)
-	data.Set("user", usuarioActual)   // usuario (string)
+	data.Set("cmd", "obtenerUsuario")
+	data.Set("user", usuarioActual)
 
-	r, err := client.PostForm("https://localhost:10443", data) // enviamos por POST
+	r, err := client.PostForm("https://localhost:10443", data)
 	chk(err)
 	resp := srv.Resp{}
-	json.NewDecoder(r.Body).Decode(&resp) // decodificamos la respuesta para utilizar sus campos más adelante
+	json.NewDecoder(r.Body).Decode(&resp)
 
 	var keyServidor []byte
 	dataKey, err := ioutil.ReadFile("keyServidor.txt")
@@ -203,22 +197,20 @@ func obtenerUsuario(client *http.Client) user {
 	err = json.Unmarshal([]byte(dataKey), &keyServidor)
 	chk(err)
 	var usuario user
-	//usuarioDesencriptado := util.Decrypt([]byte(resp.Msg), keyServidor)
-	//usuarioDesencriptado = util.Decompress(usuarioDesen(criptado)
 	json.Unmarshal([]byte(resp.Msg), &usuario)
 	if resp.Ok {
 		fmt.Println(usuario)
 		return usuario
 	}
 	fmt.Println("No se ha podido obtener el usuario")
-	r.Body.Close() // hay que cerrar el reader del body
+	r.Body.Close()
 	return usuario
 }
 
 func uploadComando(nombreFichero string, client *http.Client) {
-	data := url.Values{}            // estructura para contener los valores
-	data.Set("cmd", "upload")       // comando (string)
-	data.Set("user", usuarioActual) // usuario (string)
+	data := url.Values{}
+	data.Set("cmd", "upload")
+	data.Set("user", usuarioActual)
 
 	nombreFichero = nombreFichero[:len(nombreFichero)-2]
 	usuario := obtenerUsuario(client)
@@ -228,28 +220,23 @@ func uploadComando(nombreFichero string, client *http.Client) {
 		fmt.Println(err)
 	} else {
 		data.Set("ruta", ruta)
-		//contenidoFicheroHasheado := util.Hash(file)
-		//fmt.Println(contenidoFicheroHasheado)
-		//contenidoFicheroHasheado := util.Compress(file)
-		//keyPublic := []byte(usuario.Data["public"])
-		//keyPublic = keyPublic[:16]
 		data.Set("ruta", ruta)
-		data.Set("contenidoFichero", string(file)) // usuario (string)
+		data.Set("contenidoFichero", string(file))
 		data.Set("nombreFichero", nombreFichero)
 
-		r, err := client.PostForm("https://localhost:10443", data) // enviamos por POST
+		r, err := client.PostForm("https://localhost:10443", data)
 		chk(err)
 		resp := srv.Resp{}
-		json.NewDecoder(r.Body).Decode(&resp) // decodificamos la respuesta para utilizar sus campos más adelante
+		json.NewDecoder(r.Body).Decode(&resp)
 		fmt.Println(resp.Msg)
-		r.Body.Close() // hay que cerrar el reader del body
+		r.Body.Close()
 	}
 }
 
 func touchComando(nombreFichero string, client *http.Client) {
 	data := url.Values{}
-	data.Set("cmd", "touch")        // comando (string)
-	data.Set("user", usuarioActual) // usuario (string)
+	data.Set("cmd", "touch")
+	data.Set("user", usuarioActual)
 	data.Set("ruta", ruta)
 	data.Set("nombreFichero", nombreFichero)
 	fmt.Print("Contenido: ")
@@ -258,88 +245,86 @@ func touchComando(nombreFichero string, client *http.Client) {
 	cadena = cadena[:len(cadena)-2]
 	data.Set("contenido", cadena)
 
-	r, err := client.PostForm("https://localhost:10443", data) // enviamos por POST
+	r, err := client.PostForm("https://localhost:10443", data)
 	chk(err)
 	resp := srv.Resp{}
-	json.NewDecoder(r.Body).Decode(&resp) // decodificamos la respuesta para utilizar sus campos más adelante
+	json.NewDecoder(r.Body).Decode(&resp)
 	fmt.Println(resp.Msg)
 
-	r.Body.Close() // hay que cerrar el reader del body
+	r.Body.Close()
 }
 
 func shareComando(nombreFichero string, usuario string, client *http.Client) {
 	data := url.Values{}
-	data.Set("cmd", "share")        // comando (string)
-	data.Set("user", usuarioActual) // usuario (string)
+	data.Set("cmd", "share")
+	data.Set("user", usuarioActual)
 	data.Set("nombreFichero", nombreFichero)
 	data.Set("userShare", usuario)
 
 	r, err := client.PostForm("https://localhost:10443", data) // enviamos por POST
 	chk(err)
 	resp := srv.Resp{}
-	json.NewDecoder(r.Body).Decode(&resp) // decodificamos la respuesta para utilizar sus campos más adelante
+	json.NewDecoder(r.Body).Decode(&resp)
 	fmt.Println(resp.Msg)
-	r.Body.Close() // hay que cerrar el reader del body
+	r.Body.Close()
 }
 
 func unshareComando(nombreFichero string, usuario string, client *http.Client) {
 	data := url.Values{}
-	data.Set("cmd", "unshare")      // comando (string)
-	data.Set("user", usuarioActual) // usuario (string)
+	data.Set("cmd", "unshare")
+	data.Set("user", usuarioActual)
 	data.Set("nombreFichero", nombreFichero)
 	data.Set("userUnshare", usuario)
 
 	r, err := client.PostForm("https://localhost:10443", data) // enviamos por POST
 	chk(err)
 	resp := srv.Resp{}
-	json.NewDecoder(r.Body).Decode(&resp) // decodificamos la respuesta para utilizar sus campos más adelante
+	json.NewDecoder(r.Body).Decode(&resp)
 	fmt.Println(resp.Msg)
-	r.Body.Close() // hay que cerrar el reader del body
+	r.Body.Close()
 }
 
 func publicComando(nombreFichero string, client *http.Client) {
 	data := url.Values{}
-	data.Set("cmd", "public")       // comando (string)
-	data.Set("user", usuarioActual) // usuario (string)
+	data.Set("cmd", "public")
+	data.Set("user", usuarioActual)
 	data.Set("nombreFichero", nombreFichero)
 
 	r, err := client.PostForm("https://localhost:10443", data) // enviamos por POST
 	chk(err)
 	resp := srv.Resp{}
-	json.NewDecoder(r.Body).Decode(&resp) // decodificamos la respuesta para utilizar sus campos más adelante
+	json.NewDecoder(r.Body).Decode(&resp)
 	fmt.Println(resp.Msg)
-	r.Body.Close() // hay que cerrar el reader del body*/
+	r.Body.Close()
 }
 
 func privateComando(nombreFichero string, client *http.Client) {
 	data := url.Values{}
-	data.Set("cmd", "private")      // comando (string)
-	data.Set("user", usuarioActual) // usuario (string)
+	data.Set("cmd", "private")
+	data.Set("user", usuarioActual)
 	data.Set("nombreFichero", nombreFichero)
 
 	r, err := client.PostForm("https://localhost:10443", data) // enviamos por POST
 	chk(err)
 	resp := srv.Resp{}
-	json.NewDecoder(r.Body).Decode(&resp) // decodificamos la respuesta para utilizar sus campos más adelante
+	json.NewDecoder(r.Body).Decode(&resp)
 	fmt.Println(resp.Msg)
-	r.Body.Close() // hay que cerrar el reader del body*/
+	r.Body.Close()
 }
 
 func catComando(nombreFichero string, client *http.Client) {
-	data := url.Values{}                                       // estructura para contener los valores
-	data.Set("cmd", "cat")                                     // comando (string)
-	data.Set("user", usuarioActual)                            // usuario (string)
-	data.Set("nombreFichero", nombreFichero)                   // nombre del fichero (string)
-	data.Set("ruta", ruta)                                     // ruta (string)
-	r, err := client.PostForm("https://localhost:10443", data) // enviamos por POST
+	data := url.Values{}
+	data.Set("cmd", "cat")
+	data.Set("user", usuarioActual)
+	data.Set("nombreFichero", nombreFichero)
+	data.Set("ruta", ruta)
+	r, err := client.PostForm("https://localhost:10443", data)
 	chk(err)
 	resp := srv.Resp{}
-	json.NewDecoder(r.Body).Decode(&resp) // decodificamos la respuesta para utilizar sus campos más adelante
+	json.NewDecoder(r.Body).Decode(&resp)
 	var fichero fichero
 	json.Unmarshal([]byte(resp.Msg), &fichero)
 	if resp.Ok { // Mostramos el contenido del fichero
-		//contenidoDesencriptado := util.Decrypt([]byte(fichero.Contenido), keyPublic)
-		//contenidoDesencriptado = util.Decompress(contenidoDesencriptado)
 		nombreFichero := strings.Split(resp.Msg, " ")[0]
 		contenidoFichero := resp.Msg[len(nombreFichero)+1 : len(resp.Msg)]
 		fmt.Println("Nombre: " + nombreFichero)
@@ -347,36 +332,35 @@ func catComando(nombreFichero string, client *http.Client) {
 	} else {
 		fmt.Println(resp.Msg)
 	}
-	r.Body.Close() // hay que cerrar el reader del body
+	r.Body.Close()
 }
 
 func deleteComando(nombreFichero string, client *http.Client) {
 
-	data := url.Values{}                     // estructura para contener los valores
-	data.Set("cmd", "delete")                // comando (string)
-	data.Set("user", usuarioActual)          // usuario (string)
-	data.Set("nombreFichero", nombreFichero) // nombre del fichero (string)
+	data := url.Values{}
+	data.Set("cmd", "delete")
+	data.Set("user", usuarioActual)
+	data.Set("nombreFichero", nombreFichero)
 
 	r, err := client.PostForm("https://localhost:10443", data) // enviamos por POST
 	chk(err)
 	resp := srv.Resp{}
-	json.NewDecoder(r.Body).Decode(&resp) // decodificamos la respuesta para utilizar sus campos más adelante
-	//fmt.Println(resp)                     // imprimimos por pantalla
+	json.NewDecoder(r.Body).Decode(&resp)
 	if resp.Ok {
 		fmt.Println(resp.Msg)
 	} else {
 		fmt.Println(resp.Msg)
 	}
-	r.Body.Close() // hay que cerrar el reader del body
+	r.Body.Close()
 }
 
 func detailsComando(nombreFichero string, client *http.Client) {
 
-	data := url.Values{}                     // estructura para contener los valores
-	data.Set("cmd", "details")               // comando (string)
-	data.Set("user", usuarioActual)          // usuario (string)
-	data.Set("nombreFichero", nombreFichero) // nombre del fichero (string)
-	data.Set("ruta", ruta)                   // ruta (string)
+	data := url.Values{}
+	data.Set("cmd", "details")
+	data.Set("user", usuarioActual)
+	data.Set("nombreFichero", nombreFichero)
+	data.Set("ruta", ruta)
 
 	r, err := client.PostForm("https://localhost:10443", data) // enviamos por POST
 	chk(err)
@@ -419,30 +403,29 @@ func detailsComando(nombreFichero string, client *http.Client) {
 
 func cdComando(directorio string, client *http.Client) {
 
-	data := url.Values{}               // estructura para contener los valores
-	data.Set("cmd", "cd")              // comando (string)
-	data.Set("user", usuarioActual)    // usuario (string)
-	data.Set("directorio", directorio) // usuario (string)
+	data := url.Values{}
+	data.Set("cmd", "cd")
+	data.Set("user", usuarioActual)
+	data.Set("directorio", directorio)
 
 	r, err := client.PostForm("https://localhost:10443", data) // enviamos por POST
 	chk(err)
 	resp := srv.Resp{}
 	json.NewDecoder(r.Body).Decode(&resp) // decodificamos la respuesta para utilizar sus campos más adelante
-	//fmt.Println(resp)                     // imprimimos por pantalla
 	if resp.Ok {
 		ruta = resp.Msg
 	} else {
 		fmt.Println(resp.Msg)
 	}
-	r.Body.Close() // hay que cerrar el reader del body
+	r.Body.Close()
 }
 
 func noteComando(nombreFichero string, client *http.Client) {
 
-	data := url.Values{}                     // estructura para contener los valores
-	data.Set("cmd", "note")                  // comando (string)
-	data.Set("user", usuarioActual)          // usuario (string)
-	data.Set("nombreFichero", nombreFichero) // usuario (string)
+	data := url.Values{}
+	data.Set("cmd", "note")
+	data.Set("user", usuarioActual)
+	data.Set("nombreFichero", nombreFichero)
 	data.Set("ruta", ruta)
 	fmt.Print("Contenido: ")
 	inputReader := bufio.NewReader(os.Stdin)
@@ -453,7 +436,7 @@ func noteComando(nombreFichero string, client *http.Client) {
 	resp := srv.Resp{}
 	json.NewDecoder(r.Body).Decode(&resp) // decodificamos la respuesta para utilizar sus campos más adelante
 	fmt.Println(resp.Msg)
-	r.Body.Close() // hay que cerrar el reader del body
+	r.Body.Close()
 }
 
 func accionComando(cadena string) {
@@ -653,9 +636,6 @@ func Run() {
 		fmt.Print(menu)
 		fmt.Print("Opcion: ")
 		fmt.Scanln(&opcion)
-
-		/* creamos un cliente especial que no comprueba la validez de los certificados
-		esto es necesario por que usamos certificados autofirmados (para pruebas) */
 
 		tr := &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},

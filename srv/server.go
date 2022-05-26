@@ -61,7 +61,6 @@ type nota struct {
 	Contenido string
 }
 
-// ejemplo de tipo para un usuario
 type user struct {
 	Name       string            // nombre de usuario
 	Hash       []byte            // hash de la contraseña
@@ -253,8 +252,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		u.Data["public"] = req.Form.Get("pubkey")       // clave pública
 		password := util.Decode64(req.Form.Get("pass")) // contraseña (keyLogin)
 
-		// "hasheamos" la contraseña con scrypt (argon2 es mejor)
-		//u.Hash, _ = scrypt.Key(password, u.Salt, 16384, 8, 1, 32)
+		//Hasheamos la password con ARGON2
 		u.Hash = generatePassword(password, &u.Salt)
 		u.Seen = time.Now()        // asignamos tiempo de login
 		u.Token = make([]byte, 16) // token (16 bytes == 128 bits)
@@ -273,8 +271,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 		password := util.Decode64(req.Form.Get("pass")) // obtenemos la contraseña (keyLogin)
-		//hash, _ := scrypt.Key(password, u.Salt, 16384, 8, 1, 32) // scrypt de keyLogin (argon2 es mejor)
-		if !comparePassword(password, u.Hash) { // comparamos
+		if !comparePassword(password, u.Hash) {         // comparamos
 			response(w, false, "Credenciales inválidas", nil)
 		} else {
 			u.Seen = time.Now()        // asignamos tiempo de login
@@ -290,9 +287,6 @@ func handler(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 		datos, err := json.Marshal(&u) //
-		//datos = util.Compress(datos)
-		//datos = util.Encrypt(datos, keyServidor)
-		//fmt.Println(keyServidor)
 		chk(err)
 		response(w, true, string(datos), u.Token)
 	case "upload":
@@ -308,7 +302,6 @@ func handler(w http.ResponseWriter, req *http.Request) {
 			response(w, false, "No tienes permisos para subir ficheros en este directorio", u.Token)
 			return
 		}
-		//fmt.Println(req.Form.Get("contenidoFichero"))
 		contenidoFichero := req.Form.Get("contenidoFichero")
 		nombreFichero := req.Form.Get("nombreFichero")
 
@@ -725,16 +718,12 @@ func handler(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-// respuesta del servidor
-// (empieza con mayúscula ya que se utiliza en el cliente también)
-// (los variables empiezan con mayúscula para que sean consideradas en el encoding)
 type Resp struct {
 	Ok    bool   // true -> correcto, false -> error
 	Msg   string // mensaje adicional
 	Token []byte // token de sesión para utilizar por el cliente
 }
 
-// función para escribir una respuesta del servidor
 func response(w io.Writer, ok bool, msg string, token []byte) {
 	r := Resp{Ok: ok, Msg: msg, Token: token} // formateamos respuesta
 	rJSON, err := json.Marshal(&r)            // codificamos en JSON
