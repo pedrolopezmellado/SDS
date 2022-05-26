@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -34,6 +35,7 @@ type nota struct {
 type fichero struct {
 	Nombre        string
 	Contenido     string
+	Key           []byte
 	Autor         string
 	Public        bool
 	SharedUsers   map[string]user
@@ -58,6 +60,20 @@ type user struct {
 type directorio struct {
 	Nombre   string
 	Ficheros map[string]fichero
+}
+
+type PasswordConfig struct {
+	time    uint32
+	memory  uint32
+	threads uint8
+	keyLen  uint32
+}
+
+var config = &PasswordConfig{
+	time:    1,
+	memory:  64 * 1024,
+	threads: 4,
+	keyLen:  32,
 }
 
 // chk comprueba y sale si hay errores (ahorra escritura en programas sencillos)
@@ -169,19 +185,54 @@ func lsComando(client *http.Client) {
 	r.Body.Close() // hay que cerrar el reader del body
 }
 
+func obtenerUsuario(client *http.Client) user {
+	data := url.Values{}
+	data.Set("cmd", "obtenerUsuario") // comando (string)
+	data.Set("user", usuarioActual)   // usuario (string)
+
+	r, err := client.PostForm("https://localhost:10443", data) // enviamos por POST
+	chk(err)
+	resp := srv.Resp{}
+	json.NewDecoder(r.Body).Decode(&resp) // decodificamos la respuesta para utilizar sus campos más adelante
+
+	var keyServidor []byte
+	dataKey, err := ioutil.ReadFile("keyServidor.txt")
+	if err != nil {
+		log.Panicf("failed reading data from file: %s", err)
+	}
+	err = json.Unmarshal([]byte(dataKey), &keyServidor)
+	chk(err)
+	var usuario user
+	//usuarioDesencriptado := util.Decrypt([]byte(resp.Msg), keyServidor)
+	//usuarioDesencriptado = util.Decompress(usuarioDesen(criptado)
+	json.Unmarshal([]byte(resp.Msg), &usuario)
+	if resp.Ok {
+		fmt.Println(usuario)
+		return usuario
+	}
+	fmt.Println("No se ha podido obtener el usuario")
+	r.Body.Close() // hay que cerrar el reader del body
+	return usuario
+}
+
 func uploadComando(nombreFichero string, client *http.Client) {
-	// ** ejemplo de registro
 	data := url.Values{}            // estructura para contener los valores
 	data.Set("cmd", "upload")       // comando (string)
 	data.Set("user", usuarioActual) // usuario (string)
-	//dir, err := os.Getwd()
-	//fmt.Println(dir)
+
 	nombreFichero = nombreFichero[:len(nombreFichero)-2]
+	usuario := obtenerUsuario(client)
+	fmt.Println(usuario)
 	file, err := ioutil.ReadFile("./ficheros/" + nombreFichero)
 	if err != nil {
 		fmt.Println(err)
 	} else {
-		//fmt.Println(string(file))
+		data.Set("ruta", ruta)
+		//contenidoFicheroHasheado := util.Hash(file)
+		//fmt.Println(contenidoFicheroHasheado)
+		//contenidoFicheroHasheado := util.Compress(file)
+		//keyPublic := []byte(usuario.Data["public"])
+		//keyPublic = keyPublic[:16]
 		data.Set("ruta", ruta)
 		data.Set("contenidoFichero", string(file)) // usuario (string)
 		data.Set("nombreFichero", nombreFichero)
@@ -211,7 +262,6 @@ func touchComando(nombreFichero string, client *http.Client) {
 	chk(err)
 	resp := srv.Resp{}
 	json.NewDecoder(r.Body).Decode(&resp) // decodificamos la respuesta para utilizar sus campos más adelante
-	fmt.Println(resp)                     // imprimimos por pantalla
 	fmt.Println(resp.Msg)
 
 	r.Body.Close() // hay que cerrar el reader del body
@@ -276,7 +326,6 @@ func privateComando(nombreFichero string, client *http.Client) {
 }
 
 func catComando(nombreFichero string, client *http.Client) {
-	// ** ejemplo de registro
 	data := url.Values{}                                       // estructura para contener los valores
 	data.Set("cmd", "cat")                                     // comando (string)
 	data.Set("user", usuarioActual)                            // usuario (string)
@@ -289,8 +338,12 @@ func catComando(nombreFichero string, client *http.Client) {
 	var fichero fichero
 	json.Unmarshal([]byte(resp.Msg), &fichero)
 	if resp.Ok { // Mostramos el contenido del fichero
-		fmt.Println("Nombre: " + fichero.Nombre)
-		fmt.Println(fichero.Contenido)
+		//contenidoDesencriptado := util.Decrypt([]byte(fichero.Contenido), keyPublic)
+		//contenidoDesencriptado = util.Decompress(contenidoDesencriptado)
+		nombreFichero := strings.Split(resp.Msg, " ")[0]
+		contenidoFichero := resp.Msg[len(nombreFichero)+1 : len(resp.Msg)]
+		fmt.Println("Nombre: " + nombreFichero)
+		fmt.Println(contenidoFichero)
 	} else {
 		fmt.Println(resp.Msg)
 	}
@@ -334,7 +387,6 @@ func detailsComando(nombreFichero string, client *http.Client) {
 
 	if resp.Ok { // Mostramos el contenido del fichero
 		fmt.Println("Nombre: " + strings.Split(fichero.Nombre, "/")[0])
-		fmt.Println("Contenido: " + fichero.Contenido)
 		fmt.Println("Autor: " + fichero.Autor)
 		fmt.Println("Public: " + strconv.FormatBool(fichero.Public))
 		if len(fichero.SharedUsers) > 0 {
@@ -585,7 +637,6 @@ exit						Salir al menú inicial
 func Run() {
 
 	// menu
-
 	var opcion int
 
 	menu :=

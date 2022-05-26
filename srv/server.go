@@ -18,6 +18,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"regexp"
 	"sdspractica/util"
 	"strconv"
 	"strings"
@@ -37,9 +38,10 @@ type PasswordConfig struct {
 
 type fichero struct {
 	Nombre        string
-	Contenido     string
+	Contenido     []byte
 	Autor         string
 	Public        bool
+	Key           []byte
 	SharedUsers   map[string]user
 	Notas         []nota
 	NumCaracteres int
@@ -110,8 +112,9 @@ func loadEnv() {
 
 func obtenerExtension(nombreFichero string) string {
 	trozos := strings.Split(nombreFichero, ".")
+	var IsLetter = regexp.MustCompile(`^[a-zA-Z]+$`).MatchString
 
-	if len(trozos) != 2 {
+	if len(trozos) != 2 || !IsLetter(trozos[1]) {
 		return "error"
 	}
 	return trozos[1]
@@ -280,6 +283,18 @@ func handler(w http.ResponseWriter, req *http.Request) {
 			gUsers[u.Name] = u
 			response(w, true, "Credenciales válidas", u.Token)
 		}
+	case "obtenerUsuario":
+		u, ok := gUsers[req.Form.Get("user")] // ¿existe ya el usuario?
+		if !ok {
+			response(w, false, "Usuario inexistente", nil)
+			return
+		}
+		datos, err := json.Marshal(&u) //
+		//datos = util.Compress(datos)
+		//datos = util.Encrypt(datos, keyServidor)
+		//fmt.Println(keyServidor)
+		chk(err)
+		response(w, true, string(datos), u.Token)
 	case "upload":
 
 		u, ok := gUsers[req.Form.Get("user")] // ¿existe ya el usuario?
@@ -293,7 +308,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
 			response(w, false, "No tienes permisos para subir ficheros en este directorio", u.Token)
 			return
 		}
-
+		//fmt.Println(req.Form.Get("contenidoFichero"))
 		contenidoFichero := req.Form.Get("contenidoFichero")
 		nombreFichero := req.Form.Get("nombreFichero")
 
@@ -315,11 +330,18 @@ func handler(w http.ResponseWriter, req *http.Request) {
 				version = 1
 				nombreFichero = nombreFichero + "/v1"
 			}
+			salt := make([]byte, 16) // sal (16 bytes == 128 bits)
+			rand.Read(salt)          // la sal es aleatoria
+			keyFichero := util.Hash(salt)
+			keyFichero = argon2.IDKey(keyFichero, salt, config.time, config.memory, config.threads, config.keyLen)
+
+			contenidoFicheroEncriptado := util.Encrypt([]byte(contenidoFichero), keyFichero)
 			miFichero := fichero{
 				Nombre:        nombreFichero,
-				Contenido:     contenidoFichero,
+				Contenido:     contenidoFicheroEncriptado,
 				Autor:         u.Name,
 				Public:        false,
+				Key:           keyFichero,
 				SharedUsers:   make(map[string]user),
 				NumCaracteres: len(contenidoFichero),
 				Extension:     ext,
@@ -327,7 +349,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
 				Version:       version,
 			}
 			gUsers[u.Name].Directorio.Ficheros[nombreFichero] = miFichero
-			mensaje := "Fichero subido correctamente"
+			mensaje := "Fichero " + nombreFichero + " subido correctamente"
 			response(w, true, mensaje, u.Token)
 		}
 	case "cat":
@@ -350,9 +372,8 @@ func handler(w http.ResponseWriter, req *http.Request) {
 			if fichero.Public || existe { // comprobamos que el usuario tiene permisos
 				fichero.NumRevisiones++
 				gUsers[usuario].Directorio.Ficheros[nombreFichero] = fichero
-				datos, err := json.Marshal(&fichero) //
-				chk(err)
-				response(w, true, string(datos), u.Token)
+				contenido := util.Decrypt(fichero.Contenido, fichero.Key)
+				response(w, true, fichero.Nombre+" "+string(contenido), u.Token)
 			} else {
 				response(w, false, "El usuario no tiene permisos", u.Token)
 			}
@@ -360,9 +381,9 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		}
 		fichero.NumRevisiones++
 		gUsers[usuario].Directorio.Ficheros[nombreFichero] = fichero
-		datos, err := json.Marshal(&fichero) //
-		chk(err)
-		response(w, true, string(datos), u.Token)
+		contenidoDesencriptado := util.Decrypt(fichero.Contenido, fichero.Key)
+		fmt.Println(fichero.Nombre + " " + string(contenidoDesencriptado))
+		response(w, true, fichero.Nombre+" "+string(contenidoDesencriptado), u.Token)
 
 	case "delete":
 
@@ -457,18 +478,18 @@ func handler(w http.ResponseWriter, req *http.Request) {
 
 		u, ok := gUsers[req.Form.Get("user")] // ¿existe ya el usuario?
 		if !ok {
-			response(w, false, "No autentificado", nil)
+			response(w, false, "Error: No autentificado", nil)
 			return
 		} else if (u.Token == nil) || (time.Since(u.Seen).Minutes() > 60) {
 			// sin token o con token expirado
-			response(w, false, "No autentificado", nil)
+			response(w, false, "Error: No autentificado", nil)
 			return
 		}
 		contenido := req.Form.Get("contenido")
 		ruta := req.Form.Get("ruta")
 		usuario := ruta[1:]
 		if u.Name != usuario {
-			response(w, false, "No tienes permisos para crear un fichero en este directorio", u.Token)
+			response(w, false, "Error: No tienes permisos para crear un fichero en este directorio", u.Token)
 			return
 		} else {
 			nombreFichero := req.Form.Get("nombreFichero")
@@ -476,7 +497,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
 			ext := obtenerExtension(nombreFichero)
 
 			if ext == "error" {
-				response(w, false, "El nombre del fichero debe seguir el formato <nombre>.<extension>", u.Token)
+				response(w, false, "Error: El nombre del fichero debe seguir el formato <nombre>.<extension>", u.Token)
 				return
 			} else {
 				var version int
@@ -484,7 +505,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
 				if existeFichero {
 					version = ficheroExistente.Version + 1
 					if version > maxVersion {
-						response(w, false, "Has alcanzado el número máximo de versiones para el fichero", u.Token)
+						response(w, false, "Error: Has alcanzado el número máximo de versiones para el fichero", u.Token)
 						return
 					}
 					nombreFichero = nombreFichero + "/v" + strconv.Itoa(version)
@@ -492,11 +513,18 @@ func handler(w http.ResponseWriter, req *http.Request) {
 					version = 1
 					nombreFichero = nombreFichero + "/v1"
 				}
+				salt := make([]byte, 16) // sal (16 bytes == 128 bits)
+				rand.Read(salt)          // la sal es aleatoria
+				keyFichero := util.Hash(salt)
+				keyFichero = argon2.IDKey(keyFichero, salt, config.time, config.memory, config.threads, config.keyLen)
+
+				contenido := util.Encrypt([]byte(contenido), keyFichero)
 				miFichero := fichero{
 					Nombre:        nombreFichero,
 					Contenido:     contenido,
 					Autor:         u.Name,
 					Public:        false,
+					Key:           keyFichero,
 					SharedUsers:   make(map[string]user),
 					NumCaracteres: len(contenido),
 					Extension:     ext,
