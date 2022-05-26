@@ -12,7 +12,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -179,42 +178,12 @@ func lsComando(client *http.Client) {
 	r.Body.Close()
 }
 
-func obtenerUsuario(client *http.Client) user {
-	data := url.Values{}
-	data.Set("cmd", "obtenerUsuario")
-	data.Set("user", usuarioActual)
-
-	r, err := client.PostForm("https://localhost:10443", data)
-	chk(err)
-	resp := srv.Resp{}
-	json.NewDecoder(r.Body).Decode(&resp)
-
-	var keyServidor []byte
-	dataKey, err := ioutil.ReadFile("keyServidor.txt")
-	if err != nil {
-		log.Panicf("failed reading data from file: %s", err)
-	}
-	err = json.Unmarshal([]byte(dataKey), &keyServidor)
-	chk(err)
-	var usuario user
-	json.Unmarshal([]byte(resp.Msg), &usuario)
-	if resp.Ok {
-		fmt.Println(usuario)
-		return usuario
-	}
-	fmt.Println("No se ha podido obtener el usuario")
-	r.Body.Close()
-	return usuario
-}
-
 func uploadComando(nombreFichero string, client *http.Client) {
 	data := url.Values{}
 	data.Set("cmd", "upload")
 	data.Set("user", usuarioActual)
 
 	nombreFichero = nombreFichero[:len(nombreFichero)-2]
-	usuario := obtenerUsuario(client)
-	fmt.Println(usuario)
 	file, err := ioutil.ReadFile("./ficheros/" + nombreFichero)
 	if err != nil {
 		fmt.Println(err)
